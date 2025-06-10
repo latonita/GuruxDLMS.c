@@ -41,11 +41,11 @@ extern "C" {
 #include "gxignore.h"
 
 //Arduino DOIT ESP32 uses bb_init. bb_Init is used instead.
-//#if !defined(ESP_PLATFORM) && !defined(USE_ESP32_FRAMEWORK_ESP_IDF)
-//#define BYTE_BUFFER_INIT bb_init
-//#else
+#ifndef ESP_PLATFORM
+#define BYTE_BUFFER_INIT bb_init
+#else
 #define BYTE_BUFFER_INIT bb_Init
-//#endif //DESP_PLATFORM
+#endif //DESP_PLATFORM
 
 #define VECTOR_CAPACITY 50
 
