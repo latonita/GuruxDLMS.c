@@ -230,9 +230,11 @@ Note! It's not recommended to use this.
 
 #ifdef USE_ESP32_FRAMEWORK_ESP_IDF
 #include "../ArduinoIgnore.h"
+#define ESP_PLATFORM
 #define DLMS_IGNORE_IP6_SETUP
 #define DLMS_USE_EPOCH_TIME
 #define DLMS_IGNORE_NOTIFY
+#define DLMS_IGNORE_FUNCTION_CONTROL
 #define GX_DLMS_MICROCONTROLLER
 #define DLMS_IGNORE_HIGH_SHA256
 #define DLMS_IGNORE_HIGH_SHA1
