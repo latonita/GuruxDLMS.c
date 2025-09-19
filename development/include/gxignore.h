@@ -231,6 +231,7 @@ extern "C" {
     // Used when the client sends data larger than the allowed PDU size.
     // The meter is capable of writing such data directly to flash memory.
 
+#include "../ArduinoIgnore.h"  // Always include minimization settings for Esphome
 #ifdef ARDUINO
 /////////////////////////////////////////////////////////////////////////////
 //If Arduino is used.
