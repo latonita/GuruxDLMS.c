@@ -66,6 +66,7 @@ extern "C" {
         gxValueEventArg* e);
 
     int cosem_getActivityCalendar(
+        dlmsSettings* settings, 
         gxValueEventArg* e);
 
     int cosem_getAssociationLogicalName(
@@ -170,7 +171,7 @@ extern "C" {
 #ifndef DLMS_IGNORE_G3_PLC_MAC_SETUP
     int cosem_getG3PlcMacSetupNeighbourTables(
         gxArray* tables,
-        uint16_t address, 
+        uint16_t address,
         uint16_t count,
         gxValueEventArg* e);
 
@@ -276,18 +277,14 @@ extern "C" {
     int cosem_getSFSKReportingSystemList(
         gxValueEventArg* e);
 #endif //DLMS_IGNORE_SFSK_REPORTING_SYSTEM_LIST
-
-#ifdef DLMS_ITALIAN_STANDARD
-    //Convert compact data buffer to array of values.
-    //Some Italy meters require that there is a array count in data.
-    //This is against compact data structure defined in DLMS standard.
-    int compactData_getValues2(
-        dlmsSettings* settings,
-        gxByteBuffer* templateDescription,
-        gxByteBuffer* buffer,
-        variantArray* values,
-        unsigned char appendAA);
-#endif //DLMS_ITALIAN_STANDARD
+#ifndef DLMS_IGNORE_LTE_MONITORING
+    int cosem_getLteMonitoring(
+        gxValueEventArg* e);
+#endif //DLMS_IGNORE_LTE_MONITORING
+#ifndef DLMS_IGNORE_NTP_SETUP
+    int cosem_getNtpSetup(
+        gxValueEventArg* e);
+#endif //DLMS_IGNORE_NTP_SETUP
 
 #ifdef  __cplusplus
 }

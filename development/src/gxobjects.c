@@ -204,12 +204,34 @@ int obj_clearProfileGenericCaptureObjects(gxArray* captureObjects)
 }
 #endif //!(defined(DLMS_IGNORE_PROFILE_GENERIC) && defined(DLMS_IGNORE_COMPACT_DATA))
 
+#if defined(DLMS_SECURITY_SUITE_1) ||defined(DLMS_SECURITY_SUITE_2) 
+int obj_clearCertificates(gxArray* list)
+{
+    int ret = DLMS_ERROR_CODE_OK;
+#ifndef DLMS_IGNORE_MALLOC
+    uint16_t pos;
+    gxCertificateInfo* it;
+    for (pos = 0; pos != list->size; ++pos)
+    {
+        ret = arr_getByIndex(list, pos, (void**)&it);
+        if (ret != DLMS_ERROR_CODE_OK)
+        {
+            break;
+        }
+        bb_clear(&it->cert);
+    }
+#endif //DLMS_IGNORE_MALLOC
+    arr_clear(list);
+    return ret;
+}
+#endif //defined(DLMS_SECURITY_SUITE_1) ||defined(DLMS_SECURITY_SUITE_2) 
+
 #ifndef DLMS_IGNORE_ACTIVITY_CALENDAR
 int obj_clearSeasonProfile(gxArray* list)
 {
     int ret = DLMS_ERROR_CODE_OK;
 #ifndef DLMS_IGNORE_MALLOC
-    int pos;
+    uint16_t pos;
     gxSeasonProfile* sp;
     for (pos = 0; pos != list->size; ++pos)
     {
@@ -230,7 +252,7 @@ int obj_clearWeekProfileTable(gxArray* list)
 {
     int ret = DLMS_ERROR_CODE_OK;
 #ifndef DLMS_IGNORE_MALLOC
-    int pos;
+    uint16_t pos;
     gxWeekProfile* wp;
     for (pos = 0; pos != list->size; ++pos)
     {
@@ -250,7 +272,7 @@ int obj_clearDayProfileTable(gxArray* list)
 {
     int ret = DLMS_ERROR_CODE_OK;
 #ifndef DLMS_IGNORE_MALLOC
-    int pos, pos2;
+    uint16_t pos, pos2;
     gxDayProfile* it;
     gxDayProfileAction* dp;
     for (pos = 0; pos != list->size; ++pos)
@@ -289,7 +311,7 @@ int obj_clearModemConfigurationInitialisationStrings(gxArray* list)
 {
     int ret = DLMS_ERROR_CODE_OK;
 #ifndef DLMS_IGNORE_MALLOC
-    int pos;
+    uint16_t pos;
     gxModemInitialisation* it;
     for (pos = 0; pos != list->size; ++pos)
     {
@@ -312,7 +334,7 @@ int obj_clearScheduleEntries(gxArray* list)
 {
     int ret = DLMS_ERROR_CODE_OK;
 #ifndef DLMS_IGNORE_MALLOC
-    int pos;
+    uint16_t pos;
     gxScheduleEntry* it;
     for (pos = 0; pos != list->size; ++pos)
     {
@@ -334,7 +356,8 @@ int obj_clearByteBufferList(gxArray* list)
     list->size = 0;
     return 0;
 #else
-    int pos, ret = 0;
+    int ret = 0;
+    uint16_t pos;
     gxByteBuffer* it;
     for (pos = 0; pos != list->size; ++pos)
     {
@@ -355,7 +378,7 @@ int obj_clearScriptTable(gxArray* list)
 {
     int ret = DLMS_ERROR_CODE_OK;
 #ifndef DLMS_IGNORE_MALLOC
-    int pos, pos2;
+    uint16_t pos, pos2;
     gxScript* s;
     gxScriptAction* sa;
     for (pos = 0; pos != list->size; ++pos)
@@ -387,7 +410,7 @@ int obj_clearChargeTables(gxArray* list)
 {
     int ret = DLMS_ERROR_CODE_OK;
 #ifndef DLMS_IGNORE_MALLOC
-    int pos;
+    uint16_t pos;
     gxChargeTable* it;
     for (pos = 0; pos != list->size; ++pos)
     {
@@ -440,7 +463,8 @@ int obj_clearRegisterActivationMaskList(gxArray* list)
     arr_clear(list);
     return ret;
 #else
-    int ret = 0, pos;
+    int ret = 0;
+    uint16_t pos;
     gxKey* it;
     for (pos = 0; pos != list->size; ++pos)
     {
@@ -698,7 +722,7 @@ int obj_clearAvailableSwitches(
 int obj_clearCertificateInfo(gxArray* arr)
 {
     int ret = 0;
-#ifndef DLMS_IGNORE_MALLOC
+#if !(defined(DLMS_IGNORE_MALLOC) || defined(DLMS_IGNORE_CLIENT))
     gxCertificateInfo* it;
     uint16_t pos;
     for (pos = 0; pos != arr->size; ++pos)
@@ -712,11 +736,33 @@ int obj_clearCertificateInfo(gxArray* arr)
         gxfree(it->subject);
         gxfree(it->subjectAltName);
     }
-#endif //DLMS_IGNORE_MALLOC
+#endif //!(defined(DLMS_IGNORE_MALLOC) || defined(DLMS_IGNORE_CLIENT))
     arr_clear(arr);
     return ret;
 }
 #endif //DLMS_IGNORE_SECURITY_SETUP
+
+#ifndef DLMS_IGNORE_NTP_SETUP
+int obj_clearNtpSetupKeys(gxArray* arr)
+{
+    int ret = 0;
+#ifndef DLMS_IGNORE_MALLOC
+    gxKey* it;
+    uint16_t pos;
+    for (pos = 0; pos != arr->size; ++pos)
+    {
+        if ((ret = arr_getByIndex(arr, pos, (void**)&it)) != 0)
+        {
+            break;
+        }
+        bb_clear((gxByteBuffer*)it->value);
+        gxfree(it->value);
+    }
+#endif //!(defined(DLMS_IGNORE_MALLOC) || defined(DLMS_IGNORE_CLIENT))
+    arr_clear(arr);
+    return ret;
+}
+#endif //DLMS_IGNORE_NTP_SETUP
 
 void obj_clear(gxObject* object)
 {
@@ -835,7 +881,17 @@ void obj_clear(gxObject* object)
         case DLMS_OBJECT_TYPE_SECURITY_SETUP:
             bb_clear(&((gxSecuritySetup*)object)->clientSystemTitle);
             bb_clear(&((gxSecuritySetup*)object)->serverSystemTitle);
+#ifndef DLMS_IGNORE_MALLOC
+            bb_clear(&((gxSecuritySetup*)object)->guek);
+            bb_clear(&((gxSecuritySetup*)object)->gbek);
+            bb_clear(&((gxSecuritySetup*)object)->gak);
+#endif //DLMS_IGNORE_MALLOC
             obj_clearCertificateInfo(&((gxSecuritySetup*)object)->certificates);
+#if defined(DLMS_SECURITY_SUITE_1) || defined(DLMS_SECURITY_SUITE_2)
+            priv_clear(&((gxSecuritySetup*)object)->signingKey);
+            priv_clear(&((gxSecuritySetup*)object)->keyAgreementKey);
+            priv_clear(&((gxSecuritySetup*)object)->tlsKey);
+#endif //defined(DLMS_SECURITY_SUITE_1) || defined(DLMS_SECURITY_SUITE_2)
             break;
 #endif //DLMS_IGNORE_SECURITY_SETUP
 #ifndef DLMS_IGNORE_IEC_HDLC_SETUP
@@ -991,6 +1047,7 @@ void obj_clear(gxObject* object)
 #ifndef DLMS_IGNORE_REGISTER_MONITOR
         case DLMS_OBJECT_TYPE_REGISTER_MONITOR:
             va_clear(&((gxRegisterMonitor*)object)->thresholds);
+            va_clear(&((gxRegisterMonitor*)object)->lastValues);
             obj_clearRegisterMonitorActions(&((gxRegisterMonitor*)object)->actions);
             break;
 #endif //DLMS_IGNORE_REGISTER_MONITOR
@@ -1134,6 +1191,7 @@ void obj_clear(gxObject* object)
 #ifndef DLMS_IGNORE_PUSH_SETUP
         case DLMS_OBJECT_TYPE_PUSH_SETUP:
             obj_clearPushObjectList(&((gxPushSetup*)object)->pushObjectList);
+            arr_clear(&((gxPushSetup*)object)->pushProtectionParameters);
 #ifdef DLMS_IGNORE_MALLOC
             ((gxPushSetup*)object)->destination.size = 0;
 #else
@@ -1289,12 +1347,28 @@ void obj_clear(gxObject* object)
             obj_clearByteBufferList(&((gxSFSKReportingSystemList*)object)->reportingSystemList);
             break;
 #endif //DLMS_IGNORE_SFSK_REPORTING_SYSTEM_LIST
+#ifndef DLMS_IGNORE_LTE_MONITORING
+        case DLMS_OBJECT_TYPE_LTE_MONITORING:
+            break;
+#endif //DLMS_IGNORE_LTE_MONITORING
+#ifndef DLMS_IGNORE_NTP_SETUP
+        case DLMS_OBJECT_TYPE_NTP_SETUP:
+            bb_clear(&((gxNtpSetup*)object)->serverAddress);
+            bb_clear(&((gxNtpSetup*)object)->clientKey);
+            obj_clearNtpSetupKeys(&((gxNtpSetup*)object)->keys);
+            break;
+#endif //DLMS_IGNORE_IP6_SETUP
+
 #ifdef DLMS_ITALIAN_STANDARD
         case DLMS_OBJECT_TYPE_TARIFF_PLAN:
         {
-            gxfree(((gxTariffPlan*)object)->calendarName);
+            bb_clear(&((gxTariffPlan*)object)->calendarName);
             ba_clear(&((gxTariffPlan*)object)->plan.weeklyActivation);
+#if defined(DLMS_IGNORE_MALLOC) || defined(DLMS_COSEM_EXACT_DATA_TYPES)
             arr_clear(&((gxTariffPlan*)object)->plan.specialDays);
+#else
+            va_clear(&((gxTariffPlan*)object)->plan.specialDays);
+#endif //defined(DLMS_IGNORE_MALLOC) || defined(DLMS_COSEM_EXACT_DATA_TYPES)
             break;
         }
 #endif //DLMS_ITALIAN_STANDARD
@@ -1488,17 +1562,39 @@ unsigned char obj_attributeCount(gxObject* object)
         ret = 10;
         break;
     case DLMS_OBJECT_TYPE_G3_PLC_MAC_SETUP:
-        if (object->version < 3)
+        if (object->version > 2)
+        {
+            ret = 26;
+        }
+        else if (object->version == 2)
         {
             ret = 25;
         }
         else
         {
-            ret = 26;
+            //Object version is one or zero.
+            ret = 22;
         }
         break;
     case DLMS_OBJECT_TYPE_G3_PLC_6LO_WPAN:
-        ret = 21;
+        if (object->version > 2)
+        {
+            //Version #3.
+            ret = 23;
+        }
+        else if (object->version == 2)
+        {
+            ret = 21;
+        }
+        else if (object->version == 1)
+        {
+            ret = 19;
+        }
+        else
+        {
+            //Object version is zero.
+            ret = 16;
+        }
         break;
     case DLMS_OBJECT_TYPE_FUNCTION_CONTROL:
         ret = 3;
@@ -1513,7 +1609,18 @@ unsigned char obj_attributeCount(gxObject* object)
         ret = 2;
         break;
     case DLMS_OBJECT_TYPE_PUSH_SETUP:
-        ret = 7;
+        if (object->version == 0)
+        {
+            ret = 7;
+        }
+        else if (object->version == 1)
+        {
+            ret = 10;
+        }
+        else
+        {
+            ret = 13;
+        }
         break;
     case DLMS_OBJECT_TYPE_DATA_PROTECTION:
         ret = 6;
@@ -1623,6 +1730,16 @@ unsigned char obj_attributeCount(gxObject* object)
         ret = 2;
         break;
 #endif //DLMS_IGNORE_SFSK_REPORTING_SYSTEM_LIST
+#ifndef DLMS_IGNORE_LTE_MONITORING
+    case DLMS_OBJECT_TYPE_LTE_MONITORING:
+        ret = 3;
+        break;
+#endif //DLMS_IGNORE_LTE_MONITORING
+#ifndef DLMS_IGNORE_NTP_SETUP
+    case DLMS_OBJECT_TYPE_NTP_SETUP:
+        ret = 7;
+        break;
+#endif //DLMS_IGNORE_NTP_SETUP
     default:
         //Unknown type.
 #if defined(_WIN32) || defined(_WIN64) || defined(__linux__)
@@ -1808,7 +1925,14 @@ unsigned char obj_methodCount(gxObject* object)
         ret = 0;
         break;
     case DLMS_OBJECT_TYPE_SECURITY_SETUP:
-        ret = 2;
+        if (object->version == 0)
+        {
+            ret = 2;
+        }
+        else
+        {
+            ret = 8;
+        }
         break;
     case DLMS_OBJECT_TYPE_IEC_HDLC_SETUP:
         ret = 0;
@@ -1927,7 +2051,14 @@ unsigned char obj_methodCount(gxObject* object)
         ret = 0;
         break;
     case DLMS_OBJECT_TYPE_PUSH_SETUP:
-        ret = 1;
+        if (object->version < 2)
+        {
+            ret = 1;
+        }
+        else
+        {
+            ret = 2;
+        }
         break;
     case DLMS_OBJECT_TYPE_DATA_PROTECTION:
         ret = 3;
@@ -2036,6 +2167,16 @@ unsigned char obj_methodCount(gxObject* object)
         ret = 0;
         break;
 #endif //DLMS_IGNORE_SFSK_REPORTING_SYSTEM_LIST
+#ifndef DLMS_IGNORE_LTE_MONITORING
+    case DLMS_OBJECT_TYPE_LTE_MONITORING:
+        ret = 0;
+        break;
+#endif //DLMS_IGNORE_LTE_MONITORING
+#ifndef DLMS_IGNORE_NTP_SETUP
+    case DLMS_OBJECT_TYPE_NTP_SETUP:
+        ret = 3;
+        break;
+#endif //DLMS_IGNORE_NTP_SETUP
 #ifdef DLMS_ITALIAN_STANDARD
     case DLMS_OBJECT_TYPE_TARIFF_PLAN:
         ret = 0;

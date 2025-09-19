@@ -44,7 +44,7 @@ extern "C" {
         DLMS_ERROR_TYPE_COMMUNICATION_ERROR = 0x20000000
     }DLMS_ERROR_TYPE;
 
-    /////////////////////////////////////////////////////////////////////////////
+/////////////////////////////////////////////////////////////////////////////
 // Enumerates all DLMS error codes.
 // https://www.gurux.fi/Gurux.DLMS.ErrorCodes
 /////////////////////////////////////////////////////////////////////////////
@@ -101,6 +101,10 @@ extern "C" {
         //Secure connection is not supported.
         DLMS_ERROR_CODE_DLMS_SECURITY_NOT_IMPLEMENTED,
         //Invalid DLMS command.
+        // Feature is not implemented. 
+        // This means that the command is unknown.
+        // THe code might be ignored with compiler flag.
+        //See DLMS_IGNORE values.
         DLMS_ERROR_CODE_INVALID_COMMAND,
         //Invalid Block number.
         DLMS_ERROR_CODE_INVALID_BLOCK_NUMBER,
@@ -157,7 +161,11 @@ extern "C" {
         //Serialization save failed.
         DLMS_ERROR_CODE_SERIALIZATION_SAVE_FAILURE,
         //Serialization count failed.
-        DLMS_ERROR_CODE_SERIALIZATION_COUNT_FAILURE
+        DLMS_ERROR_CODE_SERIALIZATION_COUNT_FAILURE,
+        //Verify failed.
+        DLMS_ERROR_CODE_VERIFY_FAILED,
+        //Invalid X.509 certificate.
+        DLMS_ERROR_CODE_INVALID_CERTIFICATE,
     }DLMS_ERROR_CODE;
 
 #ifdef  __cplusplus

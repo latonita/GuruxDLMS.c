@@ -248,6 +248,11 @@ extern "C" {
         gxCompactData* object,
         unsigned char index,
         dlmsVARIANT* value);
+
+    int compactData_update(
+        dlmsSettings* settings,
+        gxCompactData* object,
+        unsigned char isTemplate);
 #endif //DLMS_IGNORE_COMPACT_DATA
 
 #ifndef DLMS_IGNORE_PARAMETER_MONITOR
@@ -380,6 +385,21 @@ extern "C" {
                 dlmsVARIANT* value);
 #endif //DLMS_IGNORE_SFSK_REPORTING_SYSTEM_LIST
 
+#ifndef DLMS_IGNORE_LTE_MONITORING
+            int cosem_setLteMonitoring(
+                dlmsSettings* settings,
+                gxLteMonitoring* object,
+                unsigned char index,
+                dlmsVARIANT* value);
+#endif //DLMS_IGNORE_LTE_MONITORING
+
+#ifndef DLMS_IGNORE_NTP_SETUP
+            int cosem_setNtpSetup(gxNtpSetup* object, unsigned char index, dlmsVARIANT* value);
+#endif //DLMS_IGNORE_NTP_SETUP
+
+#ifdef DLMS_ITALIAN_STANDARD
+            int cosem_setTariffPlan(gxTariffPlan* object, unsigned char index, dlmsVARIANT* value);
+#endif //DLMS_ITALIAN_STANDARD
 #ifdef  __cplusplus
 }
 #endif

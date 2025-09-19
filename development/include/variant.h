@@ -76,13 +76,16 @@ extern "C" {
 #define GX_FLOAT(X) GX_UNION(&X, fltVal, DLMS_DATA_TYPE_FLOAT32)
 #define GX_DOUBLE(X) GX_UNION(&X, dblVal, DLMS_DATA_TYPE_FLOAT64)
 #define GX_BOOL(X) GX_UNION(&X, bVal, DLMS_DATA_TYPE_BOOLEAN)
+#define GX_ENUM(X) GX_UNION(&X, cVal, DLMS_DATA_TYPE_ENUM)
 #ifdef DLMS_IGNORE_MALLOC
 #define GX_DATETIME(X) X.size = 12; GX_UNION(&X, pVal, (DLMS_DATA_TYPE)(DLMS_DATA_TYPE_BYREF | DLMS_DATA_TYPE_DATETIME))
+#define GX_DATE(X) X.size = 5; GX_UNION(&X, pVal, (DLMS_DATA_TYPE)(DLMS_DATA_TYPE_BYREF | DLMS_DATA_TYPE_DATE))
+#define GX_TIME(X) X.size = 4; GX_UNION(&X, pVal, (DLMS_DATA_TYPE)(DLMS_DATA_TYPE_BYREF | DLMS_DATA_TYPE_TIME))
 #else
 #define GX_DATETIME(X) GX_UNION(&X, pVal, (DLMS_DATA_TYPE)(DLMS_DATA_TYPE_BYREF | DLMS_DATA_TYPE_DATETIME))
-#endif //DLMS_IGNORE_MALLOC
 #define GX_DATE(X) GX_UNION(&X, pVal, (DLMS_DATA_TYPE)(DLMS_DATA_TYPE_BYREF | DLMS_DATA_TYPE_DATE))
 #define GX_TIME(X) GX_UNION(&X, pVal, (DLMS_DATA_TYPE)(DLMS_DATA_TYPE_BYREF | DLMS_DATA_TYPE_TIME))
+#endif //DLMS_IGNORE_MALLOC
 #define GX_UINT8_BYREF(X, VALUE_) GX_UNION(&X, pbVal = &VALUE_, (DLMS_DATA_TYPE)(DLMS_DATA_TYPE_BYREF | DLMS_DATA_TYPE_UINT8))
 #define GX_UINT16_BYREF(X, VALUE_) GX_UNION(&X, puiVal = &VALUE_, (DLMS_DATA_TYPE)(DLMS_DATA_TYPE_BYREF | DLMS_DATA_TYPE_UINT16))
 #define GX_UINT32_BYREF(X, VALUE_) GX_UNION(&X, pulVal = &VALUE_, (DLMS_DATA_TYPE)(DLMS_DATA_TYPE_BYREF | DLMS_DATA_TYPE_UINT32))
@@ -96,7 +99,7 @@ extern "C" {
 
 #ifdef DLMS_IGNORE_MALLOC
 #define GX_OCTET_STRING(X, VALUE_, SIZE_) GX_UNION2(&X, pVal = VALUE_, (DLMS_DATA_TYPE) (DLMS_DATA_TYPE_BYREF | DLMS_DATA_TYPE_OCTET_STRING), SIZE_, sizeof(VALUE_))
-#define GX_BIT_STRING(X, VALUE_, SIZE_) GX_UNION2(&X, pVal = VALUE_, (DLMS_DATA_TYPE) (DLMS_DATA_TYPE_BYREF | DLMS_DATA_TYPE_BIT_STRING), SIZE_, 8 * sizeof(VALUE_)/sizeof(VALUE_[0]))
+#define GX_BIT_STRING(X, VALUE_) GX_UNION(&X, pVal = &VALUE_, (DLMS_DATA_TYPE) (DLMS_DATA_TYPE_BYREF | DLMS_DATA_TYPE_BIT_STRING))
 #define GX_STRING(X, VALUE_, SIZE_) GX_UNION2(&X, pVal = VALUE_, (DLMS_DATA_TYPE)(DLMS_DATA_TYPE_BYREF | DLMS_DATA_TYPE_STRING), SIZE_, sizeof(VALUE_))
 #define GX_ARRAY(X, VALUE_) GX_UNION2(&X, pVal = &VALUE_, (DLMS_DATA_TYPE)(DLMS_DATA_TYPE_BYREF | DLMS_DATA_TYPE_ARRAY), 0, 0)
 #define GX_STRUCT(X, VALUE_) GX_UNION2(&X, pVal = &VALUE_, (DLMS_DATA_TYPE)(DLMS_DATA_TYPE_BYREF | DLMS_DATA_TYPE_STRUCTURE), 0, 0)
@@ -104,17 +107,17 @@ extern "C" {
 
 #define GX_BOOL_BYREF(X, VALUE_) GX_UNION(&X, pcVal = &VALUE_, (DLMS_DATA_TYPE)(DLMS_DATA_TYPE_BYREF | DLMS_DATA_TYPE_BOOLEAN))
 
-/*Get UInt8 value from variant.*/
+    /*Get UInt8 value from variant.*/
 #define GX_GET_UINT8(X)  (X.vt & DLMS_DATA_TYPE_BYREF) == 0 ? X.bVal : *X.pbVal
 
 /*Get UInt16 value from variant.*/
 #define GX_GET_UINT16(X) (X.vt & DLMS_DATA_TYPE_BYREF) == 0 ? X.uiVal : *X.puiVal
 
 /*Get UInt32 value from variant.*/
-#define GX_GET_UINT32(X) (X.vt & DLMS_DATA_TYPE_BYREF) == 0 ? X.culVal : *X.pulVal
+#define GX_GET_UINT32(X) (X.vt & DLMS_DATA_TYPE_BYREF) == 0 ? X.ulVal : *X.pulVal
 
 /*Get UInt64 value from variant.*/
-#define GX_GET_UINT64(X) (X.vt & DLMS_DATA_TYPE_BYREF) == 0 ? X.cullVal : *X.pullVal
+#define GX_GET_UINT64(X) (X.vt & DLMS_DATA_TYPE_BYREF) == 0 ? X.ullVal : *X.pullVal
 
 /*Get Int8 value from variant.*/
 #define GX_GET_INT8(X) (X.vt & DLMS_DATA_TYPE_BYREF) == 0 ? X.cVal : *X.pcVal
@@ -130,6 +133,8 @@ extern "C" {
 #define GX_GET_DOUBLE(X) (X.vt & DLMS_DATA_TYPE_BYREF) == 0 ? X.dblVal : *X.pdblVal
 /*Get boolean value from variant.*/
 #define GX_GET_BOOL(X) (X.vt & DLMS_DATA_TYPE_BYREF) == 0 ? (X.bVal != 0) : (*X.pbVal != 0)
+
+#define GX_ADD(X, VALUE_) GX_UNION(&X, pbVal += VALUE_, X.vt)
 
     typedef struct
     {
@@ -166,13 +171,13 @@ extern "C" {
             gxtime* dateTime;
             gxByteBuffer* strVal;
             gxByteBuffer* strUtfVal;
-            bitArray* bitArr;
 #endif //DLMS_IGNORE_MALLOC
             variantArray* Arr;
             gxByteBuffer* byteArr;
+            bitArray* bitArr;
             unsigned char* pbVal;
             signed char* pcVal;
-            short* piVal;
+            int16_t* piVal;
             int32_t* plVal;
             int64_t* pllVal;
 #ifndef DLMS_IGNORE_FLOAT32
@@ -428,8 +433,8 @@ extern "C" {
 
     //copy variant.
     int var_copy(
-        dlmsVARIANT* value,
-        dlmsVARIANT* copy);
+        dlmsVARIANT* target,
+        dlmsVARIANT* source);
 
     //Clear variant.
     int var_clear(
@@ -452,6 +457,15 @@ extern "C" {
         DLMS_DATA_TYPE type,
         gxByteBuffer* ba,
         unsigned char addType);
+
+    //Get bytes from variant value.
+    int var_getBytes4(
+        dlmsVARIANT* data,
+        DLMS_DATA_TYPE type,
+        gxByteBuffer* ba,
+        unsigned char addType,
+        unsigned char addArraySize,
+        unsigned char addStructureSize);
 
     //Get size in bytes.
     int var_getSize(
@@ -525,6 +539,67 @@ extern "C" {
 
 #endif //GX_DLMS_MICROCONTROLLER
 
+#ifndef DLMS_IGNORE_DELTA
+    //Set byte delta value to variant.
+    int var_setDeltaUInt8(
+        dlmsVARIANT* data,
+        unsigned char value);
+
+    //Set UInt16 delta value to variant.
+    int var_setDeltaUInt16(
+        dlmsVARIANT* data,
+        uint16_t value);
+
+    //Set UInt32 delta value to variant.
+    int var_setDeltaUInt32(dlmsVARIANT
+        * data,
+        uint32_t value);
+
+    //Set signed byte delta value to variant.
+    int var_setDeltaInt8(
+        dlmsVARIANT* data,
+        char value);
+
+    //Set Int16 delta value to variant.
+    int var_setDeltaInt16(
+        dlmsVARIANT* data,
+        short value);
+
+    //Set Int32 delta value to variant.
+    int var_setDeltaInt32(
+        dlmsVARIANT* data,
+        int32_t value);
+
+    //Get byte value from variant.
+    int var_getDeltaUInt8(
+        dlmsVARIANT* data,
+        unsigned char* value);
+
+    //Get UInt16 value from variant.
+    int var_getDeltaUInt16(
+        dlmsVARIANT* data,
+        uint16_t* value);
+
+    //Get UInt32 value from variant.
+    int var_getDeltaUInt32(
+        dlmsVARIANT* data,
+        uint32_t* value);
+
+    //Get signed byte value from variant.
+    int var_getDeltaInt8(
+        dlmsVARIANT* data,
+        char* value);
+
+    //Get Int16 value from variant.
+    int var_getDeltaInt16(
+        dlmsVARIANT* data,
+        short* value);
+
+    //Get Int32 value from variant.
+    int var_getDeltaInt32(
+        dlmsVARIANT* data,
+        int32_t* value);
+#endif //DLMS_IGNORE_DELTA
 #define VA_ATTACH(X, V, S) va_attach(&X, V, S, sizeof(V)/sizeof(V[0]))
 
 #ifdef  __cplusplus

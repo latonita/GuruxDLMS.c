@@ -31,7 +31,7 @@
 //---------------------------------------------------------------------------
 
 #include "../include/gxignore.h"
-#if !defined(DLMS_IGNORE_CLIENT)
+#if !(defined(DLMS_IGNORE_CLIENT) || defined(DLMS_IGNORE_MALLOC))
 #include "../include/gxmem.h"
 
 #if defined(_WIN32) || defined(_WIN64) || defined(__linux__)
@@ -77,7 +77,7 @@ int cl_snrmRequest(dlmsSettings* settings, message* messages)
         ret = dlms_getMacHdlcFrame(settings, DLMS_COMMAND_SNRM, 0, NULL, reply);
         if (ret == 0)
         {
-            mes_push(messages, reply);
+            ret = mes_push(messages, reply);
         }
         return ret;
     }
@@ -110,7 +110,10 @@ int cl_snrmRequest(dlmsSettings* settings, message* messages)
     BYTE_BUFFER_INIT(reply);
     gxByteBuffer bb;
     BYTE_BUFFER_INIT(&bb);
-    bb_capacity(&bb, 30);
+    if ((ret = bb_capacity(&bb, 30)) != 0)
+    {
+        return ret;
+    }
     pData = &bb;
 #endif //DLMS_IGNORE_MALLOC
 
@@ -167,7 +170,7 @@ int cl_snrmRequest(dlmsSettings* settings, message* messages)
     }
     bb_clear(pData);
 #ifndef DLMS_IGNORE_MALLOC
-    mes_push(messages, reply);
+    ret = mes_push(messages, reply);
 #endif //DLMS_IGNORE_MALLOC
     return ret;
 }
@@ -413,15 +416,14 @@ int cl_getApplicationAssociationRequest(
     gxByteBuffer challenge;
     gxByteBuffer* pw;
     dlmsVARIANT data;
-#ifndef DLMS_IGNORE_HIGH_GMAC
-#ifdef DLMS_IGNORE_MALLOC
+#if !defined(DLMS_IGNORE_HIGH_GMAC) || !defined(DLMS_IGNORE_HIGH_SHA256)
     gxByteBuffer pw2;
-#endif //DLMS_IGNORE_MALLOC
+    BYTE_BUFFER_INIT(&pw2);
 #endif //DLMS_IGNORE_HIGH_GMAC
 #ifndef GX_DLMS_MICROCONTROLLER
-    unsigned char APPLICATION_ASSOCIATION_REQUEST[32];
+    unsigned char APPLICATION_ASSOCIATION_REQUEST[64];
 #else
-    static unsigned char APPLICATION_ASSOCIATION_REQUEST[32];
+    static unsigned char APPLICATION_ASSOCIATION_REQUEST[64];
 #endif //DLMS_IGNORE_HIGH_GMAC
     bb_attach(&challenge, APPLICATION_ASSOCIATION_REQUEST, 0, sizeof(APPLICATION_ASSOCIATION_REQUEST));
     if (settings->authentication != DLMS_AUTHENTICATION_HIGH_ECDSA &&
@@ -444,8 +446,36 @@ int cl_getApplicationAssociationRequest(
         pw = &pw2;
 #endif //DLMS_IGNORE_MALLOC
     }
-    else
 #endif //DLMS_IGNORE_HIGH_GMAC
+    else if (settings->authentication == DLMS_AUTHENTICATION_HIGH_SHA256)
+    {
+#ifndef DLMS_IGNORE_HIGH_SHA256
+#ifdef DLMS_IGNORE_MALLOC
+        if ((ret = bb_set(&pw2, settings->password.data, settings->password.size)) != 0 ||
+            (ret = bb_set(&pw2, settings->cipher.systemTitle, 8)) != 0 ||
+            (ret = bb_set(&pw2, settings->sourceSystemTitle, 8)) != 0)
+        {
+            return ret;
+        }
+#else
+        if ((ret = bb_set(&pw2, settings->password.data, settings->password.size)) != 0 ||
+            (ret = bb_set(&pw2, settings->cipher.systemTitle.data, settings->cipher.systemTitle.size)) != 0 ||
+            (ret = bb_set(&pw2, settings->sourceSystemTitle, 8)) != 0)
+        {
+            return ret;
+        }
+#endif //DLMS_IGNORE_MALLOC
+        if ((ret = bb_set(&pw2, settings->stoCChallenge.data, settings->stoCChallenge.size)) != 0 ||
+            (ret = bb_set(&pw2, settings->ctoSChallenge.data, settings->ctoSChallenge.size)) != 0)
+        {
+            return ret;
+        }
+        pw = &pw2;
+#else
+        return DLMS_ERROR_CODE_INVALID_PARAMETER;
+#endif //DLMS_IGNORE_HIGH_SHA256
+    }
+    else
     {
         pw = &settings->password;
     }
@@ -458,9 +488,11 @@ int cl_getApplicationAssociationRequest(
         & settings->stoCChallenge,
         pw,
         &challenge);
+#if !defined(DLMS_IGNORE_HIGH_GMAC) || !defined(DLMS_IGNORE_HIGH_SHA256)
+    bb_clear(&pw2);
+#endif //!defined(DLMS_IGNORE_HIGH_GMAC) || !defined(DLMS_IGNORE_HIGH_SHA256)
     if (ret == 0)
     {
-        ++settings->cipher.invocationCounter;
         var_init(&data);
         data.vt = DLMS_DATA_TYPE_OCTET_STRING;
         data.byteArr = &challenge;
@@ -531,6 +563,22 @@ int cl_parseApplicationAssociationResponse(
         }
         else
 #endif //DLMS_IGNORE_HIGH_GMAC
+#ifndef DLMS_IGNORE_HIGH_SHA256
+        if (settings->authentication == DLMS_AUTHENTICATION_HIGH_SHA256)
+        {
+            bb_attach(&bb2, CHALLENGE_BUFF, 0, sizeof(CHALLENGE_BUFF));
+            secret = &bb2;
+            if ((ret = bb_set(secret, settings->password.data, settings->password.size)) != 0 ||
+                (ret = bb_set(secret, settings->sourceSystemTitle, 8)) != 0 ||
+                (ret = bb_set(secret, settings->cipher.systemTitle.data, settings->cipher.systemTitle.size)) != 0 ||
+                (ret = bb_set(secret, settings->ctoSChallenge.data, settings->ctoSChallenge.size)) != 0 ||
+                (ret = bb_set(secret, settings->stoCChallenge.data, settings->stoCChallenge.size)) != 0)
+            {
+                return ret;
+            }
+        }
+        else
+#endif //DLMS_IGNORE_HIGH_SHA256        
         {
             secret = &settings->password;
         }
@@ -1408,6 +1456,8 @@ int cl_releaseRequest2(dlmsSettings* settings, message* packets, unsigned char u
         {
             return ret;
         }
+        //Restore default values.
+        settings->maxPduSize = settings->initializePduSize;
         apdu_generateUserInformation(settings, &bb);
         bb.data[0] = (unsigned char)(bb.size - 1);
     }
@@ -1471,7 +1521,7 @@ int cl_disconnectRequest(dlmsSettings* settings, message* packets)
 #ifndef DLMS_IGNORE_MALLOC
         if (ret == 0)
         {
-            mes_push(packets, reply);
+            ret = mes_push(packets, reply);
         }
         else
         {
@@ -1493,7 +1543,7 @@ int cl_disconnectRequest(dlmsSettings* settings, message* packets)
 #ifndef DLMS_IGNORE_MALLOC
         if (ret == 0)
         {
-            mes_push(packets, reply);
+            ret = mes_push(packets, reply);
         }
         else
         {
@@ -1513,7 +1563,7 @@ int cl_disconnectRequest(dlmsSettings* settings, message* packets)
 #ifndef DLMS_IGNORE_MALLOC
         if (ret == 0)
         {
-            mes_push(packets, reply);
+            ret = mes_push(packets, reply);
         }
         else
         {
@@ -2026,9 +2076,12 @@ int cl_methodLN(
                 if (value->vt == DLMS_DATA_TYPE_OCTET_STRING)
                 {
                     //Space is allocated for type and size
-                    bb_capacity(&data, 5 + bb_size(value->byteArr));
+                    ret = bb_capacity(&data, 5 + bb_size(value->byteArr));
                 }
-                ret = dlms_setData(&data, value->vt, value);
+                if (ret == 0)
+                {
+                    ret = dlms_setData(&data, value->vt, value);
+                }
             }
         }
 #endif //DLMS_IGNORE_MALLOC
@@ -2248,4 +2301,4 @@ uint16_t cl_getServerAddress(uint16_t logicalAddress, uint16_t physicalAddress, 
     }
     return value;
 }
-#endif //!defined(DLMS_IGNORE_CLIENT)
+#endif //!(defined(DLMS_IGNORE_CLIENT) || defined(DLMS_IGNORE_MALLOC))

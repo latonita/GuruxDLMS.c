@@ -48,7 +48,6 @@ extern "C" {
 #endif //DESP_PLATFORM
 
 #define VECTOR_CAPACITY 50
-
     typedef struct
     {
 #if defined(GX_DLMS_BYTE_BUFFER_SIZE_32) || (!defined(GX_DLMS_MICROCONTROLLER) && (defined(_WIN32) || defined(_WIN64) || defined(__linux__)))
@@ -524,6 +523,16 @@ extern "C" {
     uint32_t bb_indexOf(
         gxByteBuffer* bb,
         char ch);
+
+#if defined(GX_DLMS_BYTE_BUFFER_SIZE_32) || (!defined(GX_DLMS_MICROCONTROLLER) && (defined(_WIN32) || defined(_WIN64) || defined(__linux__)))
+    void bb_reverse(gxByteBuffer* bb,
+        uint32_t index,
+        uint32_t count);
+#else
+    void bb_reverse(gxByteBuffer* bb,
+        uint16_t index,
+        uint16_t count);
+#endif
 
 #if defined(_WIN32) || defined(_WIN64) || defined(__linux__)
     //Print content of byte buffer to cout.

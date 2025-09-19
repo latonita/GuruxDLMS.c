@@ -397,6 +397,16 @@ const char* obj_typeToString2(DLMS_OBJECT_TYPE type)
         ret = GET_STR_FROM_EEPROM("SFSKReportingSystemList");
         break;
 #endif //DLMS_IGNORE_SFSK_REPORTING_SYSTEM_LIST
+#ifndef DLMS_IGNORE_LTE_MONITORING
+    case DLMS_OBJECT_TYPE_LTE_MONITORING:
+        ret = GET_STR_FROM_EEPROM("LTEMonitoring");
+        break;
+#endif //DLMS_IGNORE_LTE_MONITORING
+#ifndef DLMS_IGNORE_NTP_SETUP
+    case DLMS_OBJECT_TYPE_NTP_SETUP:
+        ret = GET_STR_FROM_EEPROM("NtpSetup");
+        break;
+#endif //DLMS_IGNORE_NTP_SETUP
 #ifdef DLMS_ITALIAN_STANDARD
     case DLMS_OBJECT_TYPE_TARIFF_PLAN:
         ret = GET_STR_FROM_EEPROM("TariffPlan");
@@ -1047,6 +1057,47 @@ int obj_CaptureObjectsToString(gxByteBuffer* ba, gxArray* objects)
 }
 
 #ifndef DLMS_IGNORE_PUSH_SETUP
+
+int obj_PushProtectionParametersToString(gxByteBuffer* ba, gxArray* objects)
+{
+    uint16_t pos;
+    int ret = DLMS_ERROR_CODE_OK;
+    gxPushProtectionParameters* it;
+    for (pos = 0; pos != objects->size; ++pos)
+    {
+        if ((ret = arr_getByIndex(objects, pos, (void**)&it)) != DLMS_ERROR_CODE_OK)
+        {
+            break;
+        }
+        if (pos != 0)
+        {
+            bb_addString(ba, ", ");
+        }
+#if defined(DLMS_IGNORE_MALLOC) || defined(DLMS_COSEM_EXACT_DATA_TYPES)
+        if ((ret = bb_addString(ba, obj_typeToString2((DLMS_OBJECT_TYPE)it->target->objectType))) != 0 ||
+            (ret = bb_addString(ba, " ")) != 0 ||
+            (ret = hlp_appendLogicalName(ba, it->target->logicalName)) != 0)
+        {
+            break;
+        }
+#else
+        if ((ret = bb_addIntAsString(ba, it->protectionType)) != 0 ||
+            (ret = bb_addString(ba, " ")) != 0 ||
+            (ret = bb_set(ba, it->transactionId.data, bb_size(&it->transactionId))) != 0 ||
+            (ret = bb_addString(ba, " ")) != 0 ||
+            (ret = bb_set(ba, it->originatorSystemTitle, 8)) != 0 ||
+            (ret = bb_addString(ba, " ")) != 0 ||
+            (ret = bb_set(ba, it->recipientSystemTitle, 8)) != 0 ||
+            (ret = bb_addString(ba, " ")) != 0 ||
+            (ret = bb_set(ba, it->otherInformation.data, bb_size(&it->otherInformation))) != 0)
+        {
+            break;
+        }
+#endif //#if defined(DLMS_IGNORE_MALLOC) || defined(DLMS_COSEM_EXACT_DATA_TYPES)
+    }
+    return ret;
+}
+
 int obj_pushSetupToString(gxPushSetup* object, char** buff)
 {
     int ret;
@@ -1064,11 +1115,72 @@ int obj_pushSetupToString(gxPushSetup* object, char** buff)
         (ret = bb_addIntAsString(&ba, object->randomisationStartInterval)) == 0 &&
         (ret = bb_addString(&ba, "\nIndex: 6 Value: ")) == 0 &&
         (ret = bb_addIntAsString(&ba, object->numberOfRetries)) == 0 &&
-        (ret = bb_addString(&ba, "\nIndex: 7 Value: ")) == 0 &&
-        (ret = bb_addIntAsString(&ba, object->repetitionDelay)) == 0 &&
-        (ret = bb_addString(&ba, "\n")) == 0)
+        (ret = bb_addString(&ba, "\nIndex: 7 Value: ")) == 0)
     {
-        *buff = bb_toString(&ba);
+        if (object->base.version < 2)
+        {
+            ret = bb_addIntAsString(&ba, object->repetitionDelay);
+        }
+        else
+        {
+            if ((ret = bb_addIntAsString(&ba, object->repetitionDelay2.min)) == 0 &&
+                (ret = bb_addString(&ba, ", ")) == 0 &&
+                (ret = bb_addIntAsString(&ba, object->repetitionDelay2.exponent)) == 0 &&
+                (ret = bb_addString(&ba, ", ")) == 0 &&
+                (ret = bb_addIntAsString(&ba, object->repetitionDelay2.max)) == 0)
+            {
+
+            }
+        }
+        if (object->base.version > 0)
+        {
+            if ((ret = bb_addString(&ba, "\nIndex: 8 Value: ")) == 0)
+            {
+                if (object->portReference == NULL)
+                {
+                    ret = hlp_appendLogicalName(&ba, EMPTY_LN);
+                }
+                else
+                {
+                    ret = hlp_appendLogicalName(&ba, object->portReference->logicalName);
+                }
+            }
+
+            if (ret == 0 &&
+                (ret = bb_addString(&ba, "\nIndex: 9 Value: ")) == 0 &&
+                (ret = bb_addIntAsString(&ba, object->pushClientSAP)) == 0)
+            {
+
+            }
+
+            if (ret == 0 &&
+                (ret = bb_addString(&ba, "\nIndex: 10 Value: ")) == 0)
+            {
+                ret = obj_PushProtectionParametersToString(&ba, &object->pushProtectionParameters);
+            }
+            if (object->base.version > 1 && ret == 0)
+            {
+                if ((ret = bb_addString(&ba, "\nIndex: 11 Value: ")) == 0 &&
+                    (ret = bb_addIntAsString(&ba, object->pushOperationMethod)) == 0)
+                {
+                    if ((ret = bb_addString(&ba, "\nIndex: 12 Value: ")) == 0 &&
+                        (ret = time_toString(&object->confirmationParameters.startDate, &ba)) == 0 &&
+                        (ret = bb_addString(&ba, ", ")) == 0 &&
+                        (ret = bb_addIntAsString(&ba, object->confirmationParameters.interval)) == 0)
+                    {
+                        if ((ret = bb_addString(&ba, "\nIndex: 13 Value: ")) == 0 &&
+                            (ret = time_toString(&object->lastConfirmationDateTime, &ba)) == 0)
+                        {
+                        }
+                    }
+                }
+            }
+        }
+        if (ret == 0 &&
+            (ret = bb_addString(&ba, "\n")) == 0)
+        {
+            *buff = bb_toString(&ba);
+        }
     }
     bb_clear(&ba);
     return ret;
@@ -1800,9 +1912,36 @@ int obj_ip4SetupToString(gxIp4Setup* object, char** buff)
 
 #ifndef DLMS_IGNORE_IP6_SETUP
 
+#if !__has_include(<netinet/in.h>)
+
+int obj_in6AddrToString(gxByteBuffer* ba, const IN6_ADDR* addr)
+{
+    int ret = 0;
+    uint_fast16_t pos;
+    char tmp[3];
+    for (pos = 0; pos < sizeof(IN6_ADDR); pos += 2)
+    {
+        if ((ret = hlp_bytesToHex2(&addr->u.Byte[pos], 2, tmp, sizeof(tmp))) != 0 ||
+            (ret == bb_addString(ba, tmp)) != 0)
+        {
+            break;
+        }
+        bb_addString(ba, ":");
+    }
+    if (ret == 0)
+    {
+        //Remove last ":"
+        --ba->size;
+    }
+    return ret;
+}
+#endif //!__has_include(<netinet/in.h>)
+
 int obj_getIPAddress(gxByteBuffer* ba, gxArray* arr)
 {
+#if __has_include(<netinet/in.h>)
     char tmp[64];
+#endif
     int ret;
     uint16_t pos;
     IN6_ADDR* ip;
@@ -1818,9 +1957,16 @@ int obj_getIPAddress(gxByteBuffer* ba, gxArray* arr)
             {
                 bb_addString(ba, ", ");
             }
+#if __has_include(<netinet/in.h>)
             //Add Ws2_32.lib for LabWindows/CVI.
             inet_ntop(AF_INET6, &ip, tmp, sizeof(tmp));
             bb_addString(ba, tmp);
+#else
+            if ((ret = obj_in6AddrToString(ba, ip)) != 0)
+            {
+                break;
+            }
+#endif //
         }
         if (ret == 0)
         {
@@ -1868,7 +2014,9 @@ int obj_getNeighborDiscoverySetupAsString(gxByteBuffer* ba, gxArray* arr)
 
 int obj_ip6SetupToString(gxIp6Setup* object, char** buff)
 {
+#if __has_include(<netinet/in.h>)
     char tmp[64];
+#endif
     int ret;
     gxByteBuffer ba;
     BYTE_BUFFER_INIT(&ba);
@@ -1891,12 +2039,19 @@ int obj_ip6SetupToString(gxIp6Setup* object, char** buff)
         (ret = obj_getIPAddress(&ba, &object->gatewayIPAddress)) == 0 &&
         (ret = bb_addString(&ba, "]\nIndex: 7 Value: ")) == 0)
     {
+#if __has_include(<netinet/in.h>)
         //Add Ws2_32.lib for LabWindows/CVI.
-
         inet_ntop(AF_INET6, &object->primaryDNSAddress, tmp, sizeof(tmp));
         bb_addString(&ba, tmp);
         inet_ntop(AF_INET6, &object->secondaryDNSAddress, tmp, sizeof(tmp));
         bb_addString(&ba, tmp);
+#else
+        if ((ret = obj_in6AddrToString(&ba, &object->primaryDNSAddress)) != 0 ||
+            (ret = obj_in6AddrToString(&ba, &object->secondaryDNSAddress)) != 0)
+        {
+
+        }
+#endif
         if ((ret = bb_addIntAsString(&ba, object->trafficClass)) == 0 &&
             (ret = obj_getNeighborDiscoverySetupAsString(&ba, &object->neighborDiscoverySetup)) == 0 &&
             (ret = bb_addString(&ba, "\n")) == 0)
@@ -2036,28 +2191,34 @@ int obj_G3PlcMacSetupKeyTableToString(gxG3PlcMacSetup* object, gxByteBuffer* ba)
     bb_addString(ba, "\nIndex: 5 Value: [\r\n");
     for (pos = 0; pos != object->keyTable.size; ++pos)
     {
-        if ((ret = arr_getByIndex(&object->keyTable, pos, (void**)&it)) != 0)
+        if ((ret = arr_getByIndex(&object->keyTable, pos, (void**)&it)) != 0 ||
+            (ret = bb_addString(ba, "{ ")) != 0 ||
+            (ret = bb_addIntAsString(ba, it->id)) != 0 ||
+            (ret = bb_addString(ba, ",")) != 0)
         {
-            return ret;
+            break;
         }
-        bb_addString(ba, "{ ");
-        bb_addIntAsString(ba, it->id);
-        bb_addString(ba, ",");
         //Add MAC keys as a hex string.
         if (bb_getCapacity(ba) - ba->size < 3 * MAX_G3_MAC_KEY_TABLE_KEY_SIZE)
         {
-            bb_capacity(ba, bb_size(ba) + 3 * MAX_G3_MAC_KEY_TABLE_KEY_SIZE);
+            if ((ret = bb_capacity(ba, bb_size(ba) + 3 * MAX_G3_MAC_KEY_TABLE_KEY_SIZE)) != 0)
+            {
+                break;
+            }
         }
         if ((ret = hlp_bytesToHex2(it->key, MAX_G3_MAC_KEY_TABLE_KEY_SIZE,
             (char*)ba->data + ba->size, (uint16_t)bb_available(ba))) != 0)
         {
-            return ret;
+            break;
         }
         ba->size += 3 * MAX_G3_MAC_KEY_TABLE_KEY_SIZE;
         --ba->size;
         bb_addString(ba, "}\n");
     }
-    bb_addString(ba, "]\n");
+    if (ret == 0)
+    {
+        ret = bb_addString(ba, "]\n");
+    }
     return ret;
 }
 
@@ -3679,13 +3840,118 @@ int obj_SFSKReportingSystemListToString(gxSFSKReportingSystemList* object, char*
 }
 #endif //DLMS_IGNORE_SFSK_REPORTING_SYSTEM_LIST
 
+#ifndef DLMS_IGNORE_LTE_MONITORING
+int obj_lteMonitoringToString(gxLteMonitoring* object, char** buff)
+{
+    int ret = 0;
+    gxByteBuffer bb;
+    BYTE_BUFFER_INIT(&bb);
+    if ((ret = bb_addString(&bb, "\nt3402: ")) == 0 &&
+        (ret = bb_addIntAsString(&bb, object->networkParameters.t3402)) == 0 &&
+        (ret = bb_addString(&bb, "\nt3412: ")) == 0 &&
+        (ret = bb_addIntAsString(&bb, object->networkParameters.t3412)) == 0 &&
+        (ret = bb_addString(&bb, "\nt3412ext2: ")) == 0 &&
+        (ret = bb_addIntAsString(&bb, object->networkParameters.t3412ext2)) == 0 &&
+        (ret = bb_addString(&bb, "\nt3324: ")) == 0 &&
+        (ret = bb_addIntAsString(&bb, object->networkParameters.t3324)) == 0 &&
+        (ret = bb_addString(&bb, "\nteDRX: ")) == 0 &&
+        (ret = bb_addIntAsString(&bb, object->networkParameters.teDRX)) == 0 &&
+        (ret = bb_addString(&bb, "\ntPTW: ")) == 0 &&
+        (ret = bb_addIntAsString(&bb, object->networkParameters.tPTW)) == 0 &&
+        (ret = bb_addString(&bb, "\nqRxlevMin: ")) == 0 &&
+        (ret = bb_addIntAsString(&bb, object->networkParameters.qRxlevMin)) == 0 &&
+        (ret = bb_addString(&bb, "\nqRxlevMinCE: ")) == 0 &&
+        (ret = bb_addIntAsString(&bb, object->networkParameters.qRxlevMinCE)) == 0 &&
+        (ret = bb_addString(&bb, "\nqRxLevMinCE1: ")) == 0 &&
+        (ret = bb_addIntAsString(&bb, object->networkParameters.qRxLevMinCE1)) == 0 &&
+        (ret = bb_addString(&bb, "}\nsignalQuality: ")) == 0 &&
+        (ret = bb_addIntAsString(&bb, object->qualityOfService.signalQuality)) == 0 &&
+        (ret = bb_addString(&bb, "\nsignalLevel: ")) == 0 &&
+        (ret = bb_addIntAsString(&bb, object->qualityOfService.signalLevel)) == 0 &&
+        (ret = bb_addString(&bb, "\nsignalToNoiseRatio: ")) == 0 &&
+        (ret = bb_addIntAsString(&bb, object->qualityOfService.signalToNoiseRatio)) == 0 &&
+        (ret = bb_addString(&bb, "\ncoverageEnhancement: ")) == 0 &&
+        (ret = bb_addIntAsString(&bb, object->qualityOfService.coverageEnhancement)) == 0)
+    {
+        *buff = bb_toString(&bb);
+    }
+    bb_clear(&bb);
+    return ret;
+}
+#endif //DLMS_IGNORE_LTE_MONITORING
+
+#ifndef DLMS_IGNORE_NTP_SETUP
+
+int obj_getNtpKeys(gxByteBuffer* ba, gxArray* arr)
+{
+    int ret = 0, pos;
+#ifdef DLMS_IGNORE_MALLOC
+    gxNtpKey* k;
+#else
+    gxKey3* k;
+#endif //DLMS_IGNORE_MALLOC
+    for (pos = 0; pos != arr->size; ++pos)
+    {
+        if (pos != 0)
+        {
+            bb_addString(ba, ", ");
+        }
+        ret = arr_getByIndex(arr, pos, (void**)&k);
+        if (ret != 0)
+        {
+            break;
+        }
+#ifdef DLMS_IGNORE_MALLOC
+        if ((ret = bb_addIntAsString(ba, (uint32_t)k->id)) != 0 ||
+            (ret = bb_set2(ba, k->key, 0, k->size)) != 0)
+        {
+            break;
+        }
+#else
+        if ((ret = bb_addIntAsString(ba, k->key)) != 0 ||
+            (ret = bb_addString(ba, ", ")) != 0 ||
+            (ret = bb_set(ba, ((gxByteBuffer*)k->value)->data, bb_size((gxByteBuffer*)k->value))) != 0)
+        {
+            break;
+        }
+#endif //DLMS_IGNORE_MALLOC
+    }
+    return ret;
+}
+
+int obj_NtpSetupToString(gxNtpSetup* object, char** buff)
+{
+    int ret;
+    gxByteBuffer ba;
+    BYTE_BUFFER_INIT(&ba);
+    if ((ret = bb_addString(&ba, "Index: 2 Value: ")) == 0 &&
+        (ret = bb_addIntAsString(&ba, object->activated)) == 0 &&
+        (ret = bb_addString(&ba, "\nIndex: 3 Value: ")) == 0 &&
+        (ret = bb_set(&ba, object->serverAddress.data, object->serverAddress.size)) == 0 &&
+        (ret = bb_addString(&ba, "\nIndex: 4 Value: ")) == 0 &&
+        (ret = bb_addIntAsString(&ba, object->port)) == 0 &&
+        (ret = bb_addString(&ba, "\nIndex: 5 Value: ")) == 0 &&
+        (ret = bb_addIntAsString(&ba, object->authentication)) == 0 &&
+        (ret = bb_addString(&ba, "\nIndex: 6 Value:[ ")) == 0 &&
+        (ret = obj_getNtpKeys(&ba, &object->keys)) == 0 &&
+        (ret = bb_addString(&ba, "]\nIndex: 7 Value: ")) == 0 &&
+        (ret = bb_set(&ba, object->clientKey.data, object->clientKey.size)) == 0 &&
+        (ret = bb_addString(&ba, "\n")) == 0)
+    {
+        *buff = bb_toString(&ba);
+    }
+    bb_clear(&ba);
+    return 0;
+}
+#endif //DLMS_IGNORE_NTP_SETUP
+
 #ifdef DLMS_ITALIAN_STANDARD
 int obj_TariffPlanToString(gxTariffPlan* object, char** buff)
 {
     gxByteBuffer ba;
     BYTE_BUFFER_INIT(&ba);
     bb_addString(&ba, "Index: 2 Value: ");
-    bb_addString(&ba, object->calendarName);
+    bb_set(&ba, object->calendarName.data, bb_size(&object->calendarName));
     bb_addString(&ba, "\nIndex: 3 Value: ");
     bb_addIntAsString(&ba, object->enabled);
     bb_addString(&ba, "\nIndex: 5 Value: ");
@@ -4099,6 +4365,17 @@ int obj_toString(gxObject* object, char** buff)
         ret = obj_SFSKReportingSystemListToString((gxSFSKReportingSystemList*)object, buff);
         break;
 #endif //DLMS_IGNORE_SFSK_REPORTING_SYSTEM_LIST
+#ifndef DLMS_IGNORE_LTE_MONITORING
+    case DLMS_OBJECT_TYPE_LTE_MONITORING:
+        ret = obj_lteMonitoringToString((gxLteMonitoring*)object, buff);
+        break;
+#endif //DLMS_IGNORE_LTE_MONITORING
+#ifndef DLMS_IGNORE_NTP_SETUP
+    case DLMS_OBJECT_TYPE_NTP_SETUP:
+        ret = obj_NtpSetupToString((gxNtpSetup*)object, buff);
+        break;
+#endif //DLMS_IGNORE_NTP_SETUP
+
 #ifdef DLMS_ITALIAN_STANDARD
     case DLMS_OBJECT_TYPE_TARIFF_PLAN:
         ret = obj_TariffPlanToString((gxTariffPlan*)object, buff);

@@ -34,14 +34,25 @@
 #define GXOBJECTS_H
 
 #include "gxignore.h"
+#include "gxint.h"
 #if defined(_WIN32) || defined(_WIN64)//Windows includes
 #include <ws2tcpip.h>
 #else //Linux includes.
 #ifndef DLMS_IGNORE_IP6_SETUP
+#if __has_include(<netinet/in.h>)
 #include <arpa/inet.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
+#else
+typedef struct in6_addr {
+    union {
+        unsigned char Byte[16];
+        uint16_t      Word[8];
+    } u;
+} IN6_ADDR, * PIN6_ADDR;
+#endif //__STDC_VERSION__ >= 199901L
 #define IN6_ADDR struct in6_addr
+
 #endif //DLMS_IGNORE_IP6_SETUP
 #endif
 #include "enums.h"
@@ -50,6 +61,11 @@
 #include "gxarray.h"
 #include "gxkey.h"
 #include "gxdefine.h"
+
+#if defined(DLMS_SECURITY_SUITE_1) || defined(DLMS_SECURITY_SUITE_2)
+#include "privateKey.h"
+#include "gx509Certificate.h"
+#endif //defined(DLMS_SECURITY_SUITE_1) || defined(DLMS_SECURITY_SUITE_2)
 
 #ifdef  __cplusplus
 extern "C" {
@@ -327,6 +343,11 @@ extern "C" {
          * Reconnection: Remote (d), manual (e), local (h)
         */
         DLMS_CONTROL_MODE_MODE_6,
+        /*
+         * Disconnection: Remote(b, c), manual(-), local(g)
+         * Reconnection: Remote (a, i), manual (e), local (h)
+         */
+        DLMS_CONTROL_MODE_MODE_7,
     } DLMS_CONTROL_MODE;
 
     /*
@@ -766,6 +787,7 @@ extern "C" {
 #ifndef DLMS_IGNORE_SECURITY_SETUP
     typedef struct
     {
+#ifndef DLMS_IGNORE_CLIENT
         // Used certificate entity.
         DLMS_CERTIFICATE_ENTITY entity;
 
@@ -795,6 +817,14 @@ extern "C" {
         // Certificate subject alt name.
         char* subjectAltName;
 #endif //DLMS_IGNORE_MALLOC
+#endif //DLMS_IGNORE_CLIENT
+#ifndef DLMS_IGNORE_SERVER
+        //Server side sertificate. 
+        gxByteBuffer cert;
+#ifdef DLMS_IGNORE_MALLOC
+        unsigned char CERTIFICATE_BUFFER[DLMS_X509_CETRIFICATE_MAX_SIZE];
+#endif //DLMS_IGNORE_MALLOC
+#endif //DLMS_IGNORE_SERVER
     }gxCertificateInfo;
 
     /*
@@ -819,6 +849,37 @@ extern "C" {
 #else
         uint32_t minimumInvocationCounter;
 #endif //DLMS_COSEM_INVOCATION_COUNTER_SIZE64
+        //Block cipher key.
+#ifdef DLMS_IGNORE_MALLOC
+        unsigned char guek[32];
+#else
+        gxByteBuffer guek;
+#endif //DLMS_IGNORE_MALLOC
+        //Broadcast block cipher key.
+#ifdef DLMS_IGNORE_MALLOC
+        unsigned char gbek[32];
+#else
+        gxByteBuffer gbek;
+#endif //DLMS_IGNORE_MALLOC
+
+        //Authentication key.
+#ifdef DLMS_IGNORE_MALLOC
+        unsigned char gak[32];
+#else
+        gxByteBuffer gak;
+#endif //DLMS_IGNORE_MALLOC
+
+#if defined(DLMS_SECURITY_SUITE_1) || defined(DLMS_SECURITY_SUITE_2)
+        //Signing key of the server.
+        gxPrivateKey signingKey;
+
+        //Key agreement key of the server.
+        gxPrivateKey keyAgreementKey;
+
+        //TLS pair of the server.
+        gxPrivateKey tlsKey;
+
+#endif //defined(DLMS_SECURITY_SUITE_1) || defined(DLMS_SECURITY_SUITE_2)
     } gxSecuritySetup;
 #endif //DLMS_IGNORE_SECURITY_SETUP
 
@@ -2125,7 +2186,120 @@ extern "C" {
     } gxMBusClient;
 #endif //DLMS_IGNORE_MBUS_CLIENT
 
+    typedef enum
+    {
+        DLMS_PROTECTION_TYPE_AUTHENTICATION = 1,
+        DLMS_PROTECTION_TYPE_ENCRYPTION = 2,
+        DLMS_PROTECTION_TYPE_AUTHENTICATION_ENCRYPTION = 3
+    } DLMS_PROTECTION_TYPE;
+
 #ifndef DLMS_IGNORE_PUSH_SETUP
+    /*This structure is used to count repetition delay for the next push message.*/
+    typedef struct
+    {
+        /**
+        * The minimum delay until a next push attempt is started in seconds.
+        */
+        uint16_t min;
+
+        /**
+         * Calculating the next delay.
+         */
+        uint16_t exponent;
+
+        /**
+         * The maximum delay until a next push attempt is started in seconds.
+         */
+        uint16_t max;
+
+    }gxRepetitionDelay;
+
+    /*Data protection identified key.*/
+    typedef struct
+    {
+        /*Data protection key type.*/
+        DLMS_DATA_PROTECTION_IDENTIFIED_KEY_TYPE keyType;
+    }gxDataProtectionIdentifiedKey;
+
+    /*Data protection wrapped key.*/
+    typedef struct
+    {
+        /*Data protectionKey type.*/
+        DLMS_DATA_PROTECTION_WRAPPED_KEY_TYPE keyType;
+
+        /*Key ciphered data.*/
+        gxByteBuffer key;
+    }gxDataProtectionWrappeddKey;
+
+    /*Data protection agreed key.*/
+    typedef struct
+    {
+        /*Key parameters.*/
+        gxByteBuffer parameters;
+
+        /*Key ciphered data.*/
+        gxByteBuffer data;
+    }gxDataProtectionAgreedKey;
+
+    /*Data protection Key.*/
+    typedef struct
+    {
+        /*Data protectionKey type.*/
+        DLMS_DATA_PROTECTION_KEY_TYPE dataProtectionKeyType;
+
+        /*Identified key parameters.*/
+        gxDataProtectionIdentifiedKey identifiedKey;
+
+        /*Wrapped key parameters.*/
+        gxDataProtectionWrappeddKey wrappedKey;
+        /*Agreed key parameters.*/
+        gxDataProtectionAgreedKey agreedKey;
+    }gxDataProtectionKey;
+
+    typedef struct
+    {
+        /*Protection type.*/
+        DLMS_PROTECTION_TYPE protectionType;
+
+        /**
+         * Transaction Id.
+         */
+        gxByteBuffer transactionId;
+
+        /**
+         * Originator system title.
+         */
+        unsigned char originatorSystemTitle[8];
+
+        /**
+         * Recipient system title.
+         */
+        unsigned char recipientSystemTitle[8];
+
+        /**
+         * Other information.
+         */
+        gxByteBuffer otherInformation;
+
+        /**
+         * Key info.
+         */
+        gxDataProtectionKey keyInfo;
+    }gxPushProtectionParameters;
+
+    /*Push confirmation parameters.*/
+    typedef struct
+    {
+        /**
+     * Confirmation start date. Fields of date-time not specified are not used.
+     */
+        gxtime startDate;
+        /**
+         * Confirmation time interval in seconds. Disabled, if zero.
+         */
+        uint32_t interval;
+    }gxPushConfirmationParameter;
+
     /*
     ---------------------------------------------------------------------------
     Online help:
@@ -2149,7 +2323,25 @@ extern "C" {
         gxArray communicationWindow;
         uint16_t randomisationStartInterval;
         unsigned char numberOfRetries;
+        /* Repetition delay for version #0 and #1.*/
         uint16_t repetitionDelay;
+        /* Repetition delay for Version #2.*/
+        gxRepetitionDelay repetitionDelay2;
+        /*The logical name of a communication port setup object.*/
+#ifdef DLMS_IGNORE_MALLOC
+        unsigned char portReference[6];
+#else
+        gxObject* portReference;
+#endif //DLMS_IGNORE_MALLOC
+        /*Push client SAP.*/
+        signed char pushClientSAP;
+        /*Push protection parameters.*/
+        gxArray pushProtectionParameters;
+        /*Push operation method.*/
+        DLMS_PUSH_OPERATION_METHOD pushOperationMethod;
+        gxPushConfirmationParameter confirmationParameters;
+        /*Last confirmation date time.*/
+        gxtime lastConfirmationDateTime;
         //Executed time. This is for internal use.
         uint32_t executedTime;
     } gxPushSetup;
@@ -2225,12 +2417,6 @@ extern "C" {
     } gxMBusMasterPortSetup;
 
 #endif //DLMS_IGNORE_MBUS_MASTER_PORT_SETUP
-    typedef enum
-    {
-        DLMS_PROTECTION_TYPE_AUTHENTICATION = 1,
-        DLMS_PROTECTION_TYPE_ENCRYPTION = 2,
-        DLMS_PROTECTION_TYPE_AUTHENTICATION_ENCRYPTION = 3
-    } DLMS_PROTECTION_TYPE;
 
     //Global key types.
     typedef enum
@@ -3604,7 +3790,7 @@ extern "C" {
     }functionStatus;
 
     typedef struct
-    {        
+    {
 #ifdef DLMS_IGNORE_MALLOC
         // Function name.
         unsigned char name[MAX_FUNCTION_NAME_LENGTH];
@@ -3700,10 +3886,6 @@ extern "C" {
         unsigned char templateId;
         gxByteBuffer templateDescription;
         DLMS_CAPTURE_METHOD captureMethod;
-#ifdef DLMS_ITALIAN_STANDARD
-        //Some meters require that there is a array count in data.
-        unsigned char appendAA;
-#endif //DLMS_ITALIAN_STANDARD
     } gxCompactData;
 #endif //DLMS_IGNORE_COMPACT_DATA
 
@@ -4053,6 +4235,128 @@ extern "C" {
     } gxSFSKReportingSystemList;
 #endif //DLMS_IGNORE_SFSK_REPORTING_SYSTEM_LIST
 
+#ifndef DLMS_IGNORE_LTE_MONITORING
+
+    /// <summary>
+    /// Lte coverage enhancement.
+    /// </summary>
+    typedef enum
+    {
+        // CE Mode A in LTE Cat M1 and CE Level 0 in NB-Iot.
+        DLMS_LTE_COVERAGE_ENHANCEMENT_LEVEL0 = 0,
+        // CE Mode B in LTE Cat M1 and CE Level 1 in NB-Iot.
+        DLMS_LTE_COVERAGE_ENHANCEMENT_LEVEL1,
+        // CE Level 2 in NB-Iot.
+        DLMS_LTE_COVERAGE_ENHANCEMENT_LEVEL2
+    }DLMS_LTE_COVERAGE_ENHANCEMENT;
+
+    // Network parameters for the LTE network
+    typedef struct
+    {
+        // T3402 timer in seconds.
+        uint16_t t3402;
+
+        // T3412 timer in seconds.
+        uint16_t t3412;
+
+        // T3412ext2 timer in seconds.
+        uint32_t t3412ext2;
+
+        // Power saving mode active timer timer in 0,01 seconds.
+        uint16_t t3324;
+
+        // Extended idle mode DRX cycle timer in 0,01 seconds.
+        uint32_t teDRX;
+
+        // DRX paging time window timer in seconds.
+        uint16_t tPTW;
+
+        // The minimum required Rx level in the cell in dBm.
+        signed char qRxlevMin;
+
+        // The minimum required Rx level in enhanced coverage CE Mode A.
+        signed char qRxlevMinCE;
+
+        // The minimum required Rx level in enhanced coverage CE Mode B.
+        signed char qRxLevMinCE1;
+    }gxLteNetworkParameters;
+
+    // Quality of service of the LTE network.
+    typedef struct
+    {
+        // Signal quality.
+        signed char signalQuality;
+
+        // Signal level.
+        signed char signalLevel;
+
+        // Signal to noise ratio.
+        signed char signalToNoiseRatio;
+
+        // Coverage enhancement.
+        DLMS_LTE_COVERAGE_ENHANCEMENT coverageEnhancement;
+    }gxLteQualityOfService;
+
+    // Online help:
+    // https://www.gurux.fi/Gurux.DLMS.Objects.GXDLMSLteMonitoring
+    typedef struct
+    {
+        /*
+        * Base class where class is derived.
+        */
+        gxObject base;
+
+        // Network parameters for the LTE network.
+        gxLteNetworkParameters networkParameters;
+
+        // Quality of service of the LTE network.
+        gxLteQualityOfService qualityOfService;
+    } gxLteMonitoring;
+#endif //DLMS_IGNORE_LTE_MONITORING
+
+#ifndef DLMS_IGNORE_NTP_SETUP
+
+#ifdef DLMS_IGNORE_MALLOC
+    typedef struct
+    {
+        // Authentication id.
+        uint32_t id;
+        // The size of the authentication key.
+        uint16_t size;
+        // Authentication key.
+        unsigned char key[MAX_AUTHENTICATION_KEY_LENGTH];
+    }gxNtpKey;
+#endif //DLMS_IGNORE_SERVER
+
+    // Online help:
+    // https://www.gurux.fi/Gurux.DLMS.Objects.GXDLMSNtpSetup
+    typedef struct
+    {
+        /*
+        * Base class where class is derived.
+        */
+        gxObject base;
+
+        /*Is NTP time synchronisation active.*/
+        unsigned char activated;
+
+        /*NTP server address.*/
+        gxByteBuffer serverAddress;
+
+        /*UDP port related to this protocol.*/
+        uint16_t port;
+
+        /*The authentication mode.*/
+        DLMS_NTP_AUTHENTICATION_METHOD authentication;
+
+        /*Symmetric keys for authentication.*/
+        gxArray keys;
+
+        /*Client key(NTP server public key).*/
+        gxByteBuffer clientKey;
+    } gxNtpSetup;
+#endif //DLMS_IGNORE_NTP_SETUP
+
 #ifdef DLMS_ITALIAN_STANDARD
 
     /*
@@ -4155,7 +4459,11 @@ extern "C" {
         // Seasons.
         bitArray weeklyActivation;
         // Seasons.
+#ifdef DLMS_IGNORE_MALLOC
         gxArray specialDays; //UInt16[]
+#else 
+        variantArray specialDays; //UInt16[]
+#endif //DLMS_IGNORE_MALLOC
     } gxPlan;
 
     /*
@@ -4171,7 +4479,7 @@ extern "C" {
         gxObject base;
 
         // Calendar Name.
-        char* calendarName;
+        gxByteBuffer calendarName;
         //Is tariff plan enabled.
         unsigned char enabled;
         // Tariff plan.
@@ -4209,6 +4517,10 @@ extern "C" {
 
     int obj_clearScheduleEntries(gxArray* list);
     int obj_clearScriptTable(gxArray* list);
+
+#if defined(DLMS_SECURITY_SUITE_1) ||defined(DLMS_SECURITY_SUITE_2) 
+    int obj_clearCertificates(gxArray* list);
+#endif //defined(DLMS_SECURITY_SUITE_1) ||defined(DLMS_SECURITY_SUITE_2) 
 
 #if !(defined(DLMS_IGNORE_OBJECT_POINTERS) || defined(DLMS_IGNORE_MALLOC) || defined(DLMS_COSEM_EXACT_DATA_TYPES))
     int obj_clearRegisterActivationAssignment(objectArray* list);

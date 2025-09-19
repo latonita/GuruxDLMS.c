@@ -113,7 +113,6 @@ int ba_capacity(bitArray* arr, uint16_t capacity)
 #ifndef DLMS_IGNORE_MALLOC
     if (!ba_isAttached(arr))
     {
-        arr->capacity = capacity;
         if (capacity == 0)
         {
             if (arr->data != NULL)
@@ -126,7 +125,7 @@ int ba_capacity(bitArray* arr, uint16_t capacity)
         {
             if (arr->data == NULL)
             {
-                arr->data = (unsigned char*)gxmalloc(ba_getByteCount(arr->capacity));
+                arr->data = (unsigned char*)gxmalloc(ba_getByteCount(capacity));
                 if (arr->data == NULL)
                 {
                     return DLMS_ERROR_CODE_OUTOFMEMORY;
@@ -136,7 +135,7 @@ int ba_capacity(bitArray* arr, uint16_t capacity)
             {
 #ifdef gxrealloc
                 //If compiler supports realloc.
-                unsigned char* tmp = (unsigned char*)gxrealloc(arr->data, ba_getByteCount(arr->capacity));
+                unsigned char* tmp = (unsigned char*)gxrealloc(arr->data, ba_getByteCount(capacity));
                 //If not enought memory available.
                 if (tmp == NULL)
                 {
@@ -146,7 +145,7 @@ int ba_capacity(bitArray* arr, uint16_t capacity)
  #else
                 //If compiler doesn't support realloc.
                 unsigned char* old = arr->data;
-                arr->data = (unsigned char*)gxmalloc(ba_getByteCount(arr->capacity));
+                arr->data = (unsigned char*)gxmalloc(ba_getByteCount(capacity));
                 //If not enought memory available.
                 if (arr->data == NULL)
                 {
@@ -158,6 +157,7 @@ int ba_capacity(bitArray* arr, uint16_t capacity)
  #endif // gxrealloc  
             }
         }
+        arr->capacity = capacity;
     }
 #endif //DLMS_IGNORE_MALLOC
     if (ba_getCapacity(arr) < capacity)
@@ -170,23 +170,19 @@ int ba_capacity(bitArray* arr, uint16_t capacity)
 //Push new data to the bit array.
 int ba_set(bitArray* arr, unsigned char item)
 {
-    int ret = ba_setByIndex(arr, arr->size, item);
-    if (ret == 0)
-    {
-        ++arr->size;
-    }
-    return ret;
+    return ba_setByIndex(arr, arr->size, item);
 }
 
 //Set bit by index.
 int ba_setByIndex(bitArray* arr, uint16_t index, unsigned char item)
 {
-    int ret;
-    unsigned char newItem = 0;
     int byteIndex;
-    item = item == 0 ? 0 : 1;
+    //Byte is reset when new item is added.
+    unsigned char newItem = arr->size == 0 || getByteIndex(index) > getByteIndex(arr->size - 1);
     if (!ba_isAttached(arr))
     {
+#ifndef DLMS_IGNORE_MALLOC
+        int ret;
         if (index >= arr->capacity)
         {
             if ((ret = ba_capacity(arr, arr->capacity + BIT_ARRAY_CAPACITY)) != 0)
@@ -194,25 +190,56 @@ int ba_setByIndex(bitArray* arr, uint16_t index, unsigned char item)
                 return ret;
             }
             //If we are adding a bit to the higher than next byte.
-            if (index >= arr->capacity)
+            if (index >= ba_getCapacity(arr))
             {
                 return ba_setByIndex(arr, index, item);
             }
-            newItem = 1;
         }
+#else
+        return DLMS_ERROR_CODE_OUTOFMEMORY;
+#endif //DLMS_IGNORE_MALLOC
     }
-    if (index >= arr->capacity)
+    if (index >= ba_getCapacity(arr))
     {
         return DLMS_ERROR_CODE_OUTOFMEMORY;
     }
     byteIndex = getByteIndex(index);
-    if (index % 8 == 0 || newItem)
+    if (item == 0)
     {
-        arr->data[byteIndex] = (unsigned char)(item << 7);
+        //Reset value.
+        if (newItem)
+        {
+            arr->data[byteIndex] = 0;
+            if (index > arr->size)
+            {
+                //Reset new data.
+                memset(arr->data + getByteIndex(arr->size), 0, getByteIndex(index - arr->size));
+            }
+        }
+        else
+        {
+            arr->data[byteIndex] &= ~(1 << (7 - (index % 8)));
+        }
     }
     else
     {
-        arr->data[byteIndex] |= (item << (7 - (index % 8)));
+        if (newItem)
+        {
+            arr->data[byteIndex] = (1 << (7 - (index % 8)));
+            if (index > arr->size)
+            {
+                //Reset new data.
+                memset(arr->data + getByteIndex(arr->size), 0, getByteIndex(index - arr->size));
+            }
+        }
+        else
+        {
+            arr->data[byteIndex] |= (1 << (7 - (index % 8)));
+        }
+    }
+    if (index >= arr->size)
+    {
+        arr->size = 1 + index;
     }
     return 0;
 }
@@ -285,14 +312,18 @@ int ba_toInteger(bitArray* arr, uint32_t* value)
 {
     *value = 0;
     unsigned char ch;
-    int pos, ret;
+    uint32_t tmp;
+    uint16_t pos;
+    int ret;
     for (pos = 0; pos != arr->size; ++pos)
     {
         if ((ret = ba_getByIndex(arr, pos, &ch)) != 0)
         {
             return ret;
         }
-        *value |= ch << pos;
+        tmp = ch;
+        tmp <<= pos;
+        *value |= tmp;
     }
     return 0;
 }

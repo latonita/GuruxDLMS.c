@@ -142,7 +142,7 @@ void vec_empty(
 #ifndef DLMS_IGNORE_MALLOC
     if (!vec_isAttached(arr))
     {
-        if (arr->size != 0)
+        if (arr->capacity != 0)
         {
             gxfree(arr->data);
             arr->data = NULL;
@@ -161,7 +161,7 @@ void vec_clear(
     if (!vec_isAttached(arr))
     {
         int pos;
-        if (arr->size != 0)
+        if (arr->capacity != 0)
         {
             for (pos = 0; pos != arr->size; ++pos)
             {
@@ -198,6 +198,7 @@ void ve_init(gxValueEventArg * ve)
     ve->handled = 0;
     ve->target = NULL;
     ve->index = 0;
+    ve->dataIndex = 0;
 #if !defined(DLMS_IGNORE_MALLOC) && !defined(DLMS_COSEM_EXACT_DATA_TYPES)
     ve->dataType = DLMS_DATA_TYPE_NONE;
 #endif //!defined(DLMS_IGNORE_MALLOC) && !defined(DLMS_COSEM_EXACT_DATA_TYPES)

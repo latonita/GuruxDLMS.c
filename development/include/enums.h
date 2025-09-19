@@ -38,6 +38,14 @@
 #ifdef  __cplusplus
 extern "C" {
 #endif
+
+static const unsigned char DEFAULT_BROADCAST_BLOCK_CIPHER_KEY[] = { 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA };
+static const unsigned char DEFAULT_BLOCK_CIPHER_KEY[] = { 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15 };
+static const unsigned char DEFAULT_SYSTEM_TITLE[] = { 0x41, 0x42, 0x43, 0x44, 0x45, 0x46, 0x47, 0x48 };
+static const unsigned char DEFAULT_AUTHENTICATION_KEY[] = { 0xD0, 0xD1, 0xD2, 0xD3, 0xD4, 0xD5, 0xD6, 0xD7,
+                                                            0xD8, 0xD9, 0xDA, 0xDB, 0xDC, 0xDD, 0xDE, 0xDF
+};
+
     // Server sender frame sequence starting number.
     // This buffer is also used for save challenge.
 #define PDU_MAX_HEADER_SIZE 70
@@ -159,7 +167,7 @@ extern "C" {
         */
         DLMS_SECURITY_SUITE_V1 = 1,
         /*
-            AES-GCM-256 authenticated encryption, ECDSA P-384 digital signature, ECDH P-384 key agreement, SHA-384 hash, V.44 compression and AES-256 key wrap        
+            AES-GCM-256 authenticated encryption, ECDSA P-384 digital signature, ECDH P-384 key agreement, SHA-384 hash, V.44 compression and AES-256 key wrap
         */
         DLMS_SECURITY_SUITE_V2 = 2
     } DLMS_SECURITY_SUITE;
@@ -173,7 +181,13 @@ extern "C" {
         DLMS_SERVICE_TYPE_SMS = 4,
         DLMS_SERVICE_TYPE_HDLC = 5,
         DLMS_SERVICE_TYPE_M_BUS = 6,
-        DLMS_SERVICE_TYPE_ZIG_BEE = 7
+        DLMS_SERVICE_TYPE_ZIG_BEE = 7,
+        /*DLMS Gateway.*/
+        DLMS_SERVICE_TYPE_DLMS_GATEWAY = 8,
+        /*Reliable CoAP.*/
+        DLMS_SERVICE_TYPE_RELIABLE_COAP = 9,
+        /*Unreliable CoAP.*/
+        DLMS_SERVICE_TYPE_UNRELIABLE_COAP = 10
     } DLMS_SERVICE_TYPE;
 
     typedef enum
@@ -182,6 +196,50 @@ extern "C" {
         DLMS_MESSAGE_TYPE_COSEM_APDU_XML = 1,
         DLMS_MESSAGE_TYPE_MANUFACTURER_SPESIFIC = 128
     } DLMS_MESSAGE_TYPE;
+
+    /*Push operation method defines what service class is used with push messages.*/
+    typedef enum
+    {
+        /**
+        * Unconfirmed, retry on supporting protocol layer failure.
+        */
+        DLMS_PUSH_OPERATION_METHOD_UNCONFIRMED_FAILURE = 0,
+        /**
+         * Unconfirmed, retry on missing supporting protocol layer confirmation.
+         */
+        DLMS_PUSH_OPERATION_METHOD_UNCONFIRMED_MISSING,
+        /**
+         * Confirmed, retry on missing confirmation.
+         */
+        DLMS_PUSH_OPERATION_METHOD_CONFIRMED
+    } DLMS_PUSH_OPERATION_METHOD;
+
+    /*Data protection identified key types.*/
+    typedef enum
+    {
+        /*Global unicast encryption key.*/
+        DLMS_DATA_PROTECTION_IDENTIFIED_KEY_TYPE_UNICAST_ENCRYPTION,
+        /*Global broadcast encryption key.*/
+        DLMS_DATA_PROTECTION_IDENTIFIED_KEY_TYPE_BROADCAST_ENCRYPTION
+    }DLMS_DATA_PROTECTION_IDENTIFIED_KEY_TYPE;
+
+    /*Data protection wrapped key types.*/
+    typedef enum
+    {
+        /*Master key.*/
+        DLMS_DATA_PROTECTION_WRAPPED_KEY_TYPE_MASTER_KEY = 0
+    }DLMS_DATA_PROTECTION_WRAPPED_KEY_TYPE;
+
+    /*Enumerates data protection key types.*/
+    typedef enum
+    {
+        /*Identified key.*/
+        DLMS_DATA_PROTECTION_KEY_TYPE_IDENTIFIED,
+        /*Wrapped key.*/
+        DLMS_DATA_PROTECTION_KEY_TYPE_WRAPPED,
+        /*Agreed.*/
+        DLMS_DATA_PROTECTION_KEY_TYPE_AGREED
+    }DLMS_DATA_PROTECTION_KEY_TYPE;
 
     typedef enum
     {
@@ -392,10 +450,35 @@ extern "C" {
         DLMS_OBJECT_TYPE_G3_PLC_6LO_WPAN = 92,
 
         /*
+        * NTP setup.
+        */
+        DLMS_OBJECT_TYPE_NTP_SETUP = 100,
+        /*
         * Function control.
         */
         DLMS_OBJECT_TYPE_FUNCTION_CONTROL = 122,
-            
+
+        // Communication port protection.
+        DLMS_OBJECT_TYPE_COMMUNICATION_PORT_PROTECTION = 124,
+
+        // LTE monitoring.
+        DLMS_OBJECT_TYPE_LTE_MONITORING = 151,
+
+        // CoAP setup.
+        DLMS_OBJECT_TYPE_COAP_SETUP = 152,
+
+        // CoAP diagnostic.
+        DLMS_OBJECT_TYPE_COAP_DIAGNOSTIC = 153,
+
+        // G3-PLC Hybrid RF MAC layer counters.
+        DLMS_OBJECT_TYPE_G3_PLC_HYBRID_RF_MAC_LAYER_COUNTERS = 160,
+
+        // G3-PLC Hybrid RF MAC setup.
+        DLMS_OBJECT_TYPE_G3_PLC_HYBRID_RF_MAC_SETUP = 161,
+
+        // G3-PLC Hybrid 6LoWPAN adaptation layer setup.
+        DLMS_OBJECT_TYPE_G3_PLC_HYBRID_6LOWPAN_ADAPTATION_LAYER_SETUP = 162,
+
         /*
         * Configure a ZigBee PRO device with information necessary to create or
         * join the network.
@@ -442,18 +525,21 @@ extern "C" {
     typedef enum
     {
         DLMS_DATA_TYPE_NONE = 0,
+        DLMS_DATA_TYPE_ARRAY = 1,
+        DLMS_DATA_TYPE_STRUCTURE = 2,
         DLMS_DATA_TYPE_BOOLEAN = 3,
         DLMS_DATA_TYPE_BIT_STRING = 4,
         DLMS_DATA_TYPE_INT32 = 5,
         DLMS_DATA_TYPE_UINT32 = 6,
         DLMS_DATA_TYPE_OCTET_STRING = 9,
         DLMS_DATA_TYPE_STRING = 10,
-        DLMS_DATA_TYPE_BINARY_CODED_DESIMAL = 13,
         DLMS_DATA_TYPE_STRING_UTF8 = 12,
+        DLMS_DATA_TYPE_BINARY_CODED_DESIMAL = 13,
         DLMS_DATA_TYPE_INT8 = 15,
         DLMS_DATA_TYPE_INT16 = 16,
         DLMS_DATA_TYPE_UINT8 = 17,
         DLMS_DATA_TYPE_UINT16 = 18,
+        DLMS_DATA_TYPE_COMPACT_ARRAY = 19,
         DLMS_DATA_TYPE_INT64 = 20,
         DLMS_DATA_TYPE_UINT64 = 21,
         DLMS_DATA_TYPE_ENUM = 22,
@@ -462,9 +548,12 @@ extern "C" {
         DLMS_DATA_TYPE_DATETIME = 25,
         DLMS_DATA_TYPE_DATE = 26,
         DLMS_DATA_TYPE_TIME = 27,
-        DLMS_DATA_TYPE_ARRAY = 1,
-        DLMS_DATA_TYPE_STRUCTURE = 2,
-        DLMS_DATA_TYPE_COMPACT_ARRAY = 19,
+        DLMS_DATA_TYPE_DELTA_INT8 = 28,
+        DLMS_DATA_TYPE_DELTA_INT16 = 29,
+        DLMS_DATA_TYPE_DELTA_INT32 = 30,
+        DLMS_DATA_TYPE_DELTA_UINT8 = 31,
+        DLMS_DATA_TYPE_DELTA_UINT16 = 32,
+        DLMS_DATA_TYPE_DELTA_UINT32 = 33,
         DLMS_DATA_TYPE_BYREF = 0x80
     } DLMS_DATA_TYPE;
 
@@ -743,6 +832,14 @@ extern "C" {
         * Utf8 String.
         */
         BER_TYPE_UTF8_STRING = 12,
+        /*
+        * Sequence.
+        */
+        BER_TYPE_SEQUENCE = 16,
+        /*
+        * Set.
+        */
+        BER_TYPE_SET = 17,
         /*
         * Numeric string.
         */
@@ -1998,489 +2095,489 @@ extern "C" {
     /*
     * Enumerates all Unit constants.
     */
-    typedef enum 
+    typedef enum
     {
-    /*
-    * No Unit.
-    */
-    DLMS_UNIT_NONE = 0,
-    /*
-    * Year.
-    */
-    DLMS_UNIT_YEAR = 1,
+        /*
+        * No Unit.
+        */
+        DLMS_UNIT_NONE = 0,
+        /*
+        * Year.
+        */
+        DLMS_UNIT_YEAR = 1,
 
-    /*
-    * Month.
-    */
-    DLMS_UNIT_MONTH = 2,
+        /*
+        * Month.
+        */
+        DLMS_UNIT_MONTH = 2,
 
-    /*
-    * Week.
-    */
-    DLMS_UNIT_WEEK = 3,
+        /*
+        * Week.
+        */
+        DLMS_UNIT_WEEK = 3,
 
-    /*
-    * Day.
-    */
-    DLMS_UNIT_DAY = 4,
+        /*
+        * Day.
+        */
+        DLMS_UNIT_DAY = 4,
 
-    /*
-    * Hour.
-    */
-    DLMS_UNIT_HOUR = 5,
+        /*
+        * Hour.
+        */
+        DLMS_UNIT_HOUR = 5,
 
-    /*
-    * Minute.
-    */
-    DLMS_UNIT_MINUTE = 6,
+        /*
+        * Minute.
+        */
+        DLMS_UNIT_MINUTE = 6,
 
-    /*
-    * Second.
-    */
-    DLMS_UNIT_SECOND = 7,
+        /*
+        * Second.
+        */
+        DLMS_UNIT_SECOND = 7,
 
-    /*
-    * Phase angle degree.
-    */
-    DLMS_UNIT_PHASE_ANGLE_DEGREE = 8,
-    /*
-    * Temperature T degree centigrade, rad*180/p.
-    */
-    DLMS_UNIT_TEMPERATURE = 9,
-    /*
-    * Local currency.
-    */
-    DLMS_UNIT_LOCAL_CURRENCY = 10,
-    /*
-    * Length l meter m.
-    */
-    DLMS_UNIT_LENGTH = 11,
-    /*
-    * Speed v m/s.
-    */
-    DLMS_UNIT_SPEED = 12,
-    /*
-    * Volume V m3.
-    */
-    DLMS_UNIT_VOLUME_CUBIC_METER = 13,
-    /*
-    * Corrected volume m3.
-    */
-    DLMS_UNIT_CORRECTED_VOLUME = 14,
-    /*
-    * Volume flux m3/60*60s.
-    */
-    DLMS_UNIT_VOLUME_FLUX_HOUR = 15,
-    /*
-    * Corrected volume flux m3/60*60s.
-    */
-    DLMS_UNIT_CORRECTED_VOLUME_FLUX_HOUR = 16,
-    /*
-    * Volume flux m3/24*60*60s.
-    */
-    DLMS_UNIT_VOLUME_FLUX_DAY = 17,
-    /*
-    * Corrected volume flux m3/24*60*60s.
-    */
-    DLMS_UNIT_CORRECTED_VOLUME_FLUX_DAY = 18,
-    /*
-    * Volume 10-3 m3.
-    */
-    DLMS_UNIT_VOLUME_LITER = 19,
-    /*
-    * Mass m kilogram kg.
-    */
-    DLMS_UNIT_MASS_KG = 20,
-    /*
-    * return "Force F newton N.
-    */
-    DLMS_UNIT_FORCE = 21,
-    /*
-    * Energy newtonmeter J = Nm = Ws.
-    */
-    DLMS_UNIT_ENERGY = 22,
-    /*
-    * Pressure p pascal N/m2.
-    */
-    DLMS_UNIT_PRESSURE_PASCAL = 23,
-    /*
-    * Pressure p bar 10-5 N/m2.
-    */
-    DLMS_UNIT_PRESSURE_BAR = 24,
-    /*
-    * Energy joule J = Nm = Ws.
-    */
-    DLMS_UNIT_ENERGY_JOULE = 25,
-    /*
-    * Thermal power J/60*60s.
-    */
-    DLMS_UNIT_THERMAL_POWER = 26,
-    /*
-    * Active power P watt W = J/s.
-    */
-    DLMS_UNIT_ACTIVE_POWER = 27,
-    /*
-    * Apparent power S.
-    */
-    DLMS_UNIT_APPARENT_POWER = 28,
-    /*
-    * Reactive power Q.
-    */
-    DLMS_UNIT_REACTIVE_POWER = 29,
-    /*
-    * Active energy W*60*60s.
-    */
-    DLMS_UNIT_ACTIVE_ENERGY = 30,
-    /*
-    * Apparent energy VA*60*60s.
-    */
-    DLMS_UNIT_APPARENT_ENERGY = 31,
-    /*
-    * Reactive energy var*60*60s.
-    */
-    DLMS_UNIT_REACTIVE_ENERGY = 32,
-    /*
-    * Current I ampere A.
-    */
-    DLMS_UNIT_CURRENT = 33,
-    /*
-    * Electrical charge Q coulomb C = As.
-    */
-    DLMS_UNIT_ELECTRICAL_CHARGE = 34,
-    /*
-    * Voltage.
-    */
-    DLMS_UNIT_VOLTAGE = 35,
-    /*
-    * Electrical field strength E V/m.
-    */
-    DLMS_UNIT_ELECTRICAL_FIELD_STRENGTH = 36,
-    /*
-    * Capacity C farad C/V = As/V.
-    */
-    DLMS_UNIT_CAPACITY = 37,
-    /*
-    * Resistance R ohm = V/A.
-    */
-    DLMS_UNIT_RESISTANCE = 38,
-    /*
-    * Resistivity.
-    */
-    DLMS_UNIT_RESISTIVITY = 39,
-    /*
-    * Magnetic flux F weber Wb = Vs.
-    */
-    DLMS_UNIT_MAGNETIC_FLUX = 40,
-    /*
-    * Induction T tesla Wb/m2.
-    */
-    DLMS_UNIT_INDUCTION = 41,
-    /*
-    * Magnetic field strength H A/m.
-    */
-    DLMS_UNIT_MAGNETIC = 42,
-    /*
-    * Inductivity L henry H = Wb/A.
-    */
-    DLMS_UNIT_INDUCTIVITY = 43,
-    /*
-    * Frequency f.
-    */
-    DLMS_UNIT_FREQUENCY = 44,
-    /*
-    * Active energy meter constant 1/Wh.
-    */
-    DLMS_UNIT_ACTIVE = 45,
-    /*
-    * Reactive energy meter constant.
-    */
-    DLMS_UNIT_REACTIVE = 46,
-    /*
-    * Apparent energy meter constant.
-    */
-    DLMS_UNIT_APPARENT = 47,
-    /*
-    * V260*60s.
-    */
-    DLMS_UNIT_V260 = 48,
-    /*
-    * A260*60s.
-    */
-    DLMS_UNIT_A260 = 49,
-    /*
-    * Mass flux kg/s.
-    */
-    DLMS_UNIT_MASS_KG_PER_SECOND = 50,
-    /*
-    * Unit is Conductance siemens 1/ohm.
-    */
-    DLMS_UNIT_CONDUCTANCE = 51,
-    /*
-    * Temperature in Kelvin.
-    */
-    DLMS_UNIT_KELVIN = 52,
-    /*
-    * 1/(V2h) RU2h , volt-squared hour meter constant or pulse value.
-    */
-    DLMS_UNIT_RU2H = 53,
-    /*
-    * 1/(A2h) RI2h , ampere-squared hour meter constant or pulse value.
-    */
-    DLMS_UNIT_RI2H = 54,
-    /*
-    * 1/m3 RV , meter constant or pulse value  = volume).
-    */
-    DLMS_UNIT_CUBIC_METER_RV = 55,
-    /*
-    * Percentage.
-    */
-    DLMS_UNIT_PERCENTAGE = 56,
-    /*
-    * Ah ampere hours.
-    */
-    DLMS_UNIT_AMPERE_HOURS = 57,
-    /*
-    * Wh/m3 energy per volume 3,6*103 J/m3.
-    */
-    DLMS_UNIT_ENERGY_PER_VOLUME = 60,
-    /*
-    * J/m3 calorific value, wobbe.
-    */
-    DLMS_UNIT_WOBBE = 61,
-    /*
-    * Mol % molar fraction of gas composition mole percent  = Basic gas
-    * composition unit).
-    */
-    DLMS_UNIT_MOLE_PERCENT = 62,
-    /*
-    * g/m3 mass density, quantity of material.
-    */
-    DLMS_UNIT_MASS_DENSITY = 63,
-    /*
-    * Dynamic viscosity pascal second  = Characteristic of gas stream).
-    */
-    DLMS_UNIT_PASCAL_SECOND = 64,
-    /*
-    * J/kg Specific energy NOTE The amount of energy per unit of mass of a
-    * substance Joule / kilogram m2 . kg . s -2 / kg = m2.
-    */
-    DLMS_UNIT_JOULE_KILOGRAM = 65,
-    /*
-    * Pressure, gram per square centimeter.
-    */
-    DLMS_UNIT_PRESSURE_GRAM_PER_SQUARE_CENTIMETER = 66,
-    /*
-    * Pressure, atmosphere.
-    */
-    DLMS_UNIT_PRESSURE_ATMOSPHERE = 67,
-    /*
-    * Signal strength, dB milliwatt (e.g. of GSM radio systems)
-    */
-    DLMS_UNIT_SIGNAL_STRENGTH_MILLI_WATT = 70,
-    /*
-    * Signal strength, dB microvolt.
-    */
-    DLMS_UNIT_SIGNAL_STRENGTH_MICRO_VOLT = 71,
-    /*
-    * Logarithmic unit that expresses the ratio between two values of a physical quantity
-    */
-    DLMS_UNIT_DB = 72,
-    /*
-    * Length in inches.
-    */
-    DLMS_UNIT_INCH = 128,
-    /*
-    * Foot (Length).
-    */
-    DLMS_UNIT_FOOT = 129,
-    /*
-    * Pound (mass).
-    */
-    DLMS_UNIT_POUND = 130,
-    /*
-    * Fahrenheit.
-    */
-    DLMS_UNIT_FAHRENHEIT = 131,
-    /*
-    * Rankine.
-    */
-    DLMS_UNIT_RANKINE = 132,
-    /*
-    * Square inch.
-    */
-    DLMS_UNIT_SQUARE_INCH = 133,
-    /*
-    * Square foot.
-    */
-    DLMS_UNIT_SQUARE_FOOT = 134,
-    /*
-    * Acre.
-    */
-    DLMS_UNIT_ACRE = 135,
-    /*
-    * Cubic inch.
-    */
-    DLMS_UNIT_CUBIC_INCH = 136,
-    /*
-    * Cubic foot.
-    */
-    DLMS_UNIT_CUBIC_FOOT = 137,
-    /*
-    * Acre foot.
-    */
-    DLMS_UNIT_ACRE_FOOT = 138,
-    /*
-    * Gallon (imperial).
-    */
-    DLMS_UNIT_GALLON_IMPERIAL = 139,
-    /*
-    *  Gallon (US).
-    */
-    DLMS_UNIT_GALLON_US = 140,
-    /*
-    * Pound force.
-    */
-    DLMS_UNIT_POUND_FORCE = 141,
-    /*
-    * Pound force per square inch.
-    */
-    DLMS_UNIT_POUND_FORCE_PER_SQUARE_INCH = 142,
-    /*
-    * Pound per cubic foot.
-    */
-    DLMS_UNIT_POUND_PER_CUBIC_FOOT = 143,
-    /*
-    * Pound per (foot second).
-    */
-    DLMS_UNIT_POUND_PER_FOOT_SECOND = 144,
-    /*
-    * Square foot per second.
-    */
-    DLMS_UNIT_SQUARE_FOOT_PER_SECOND = 145,
-    /*
-    * British thermal unit.
-    */
-    DLMS_UNIT_BRITISH_THERMAL_UNIT = 146,
-    /*
-    * Therm EU.
-    */
-    DLMS_UNIT_THERM_EU = 147,
-    /*
-    * Therm US.
-    */
-    DLMS_UNIT_THERM_US = 148,
-    /*
-    * British thermal unit per pound.
-    */
-    DLMS_UNIT_BRITISH_THERMAL_UNIT_PER_POUND = 149,
-    /*
-    * British thermal unit per cubic foot.
-    */
-    DLMS_UNIT_BRITISH_THERMAL_UNIT_PER_CUBIC_FOOT = 150,
-    /*
-    * Cubic feet.
-    */
-    DLMS_UNIT_CUBIC_FEET = 151,
-    /*
-    * Foot per second.
-    */
-    DLMS_UNIT_FOOT_PER_SECOND = 152,
-    /*
-    * Cubic foot per second.
-    */
-    DLMS_UNIT_CUBIC_FOOT_PER_SECOND = 153,
-    /*
-    * Cubic foot per min.
-    */
-    DLMS_UNIT_CUBIC_FOOT_PER_MIN = 154,
-    /*
-    * Cubic foot per hour.
-    */
-    DLMS_UNIT_CUBIC_FOOT_PER_HOUR = 155,
-    /*
-    * Cubic foot per day
-    */
-    DLMS_UNIT_CUBIC_FOOT_PER_DAY = 156,
-    /*
-    * Acre foot per second.
-    */
-    DLMS_UNIT_ACRE_FOOT_PER_SECOND = 157,
-    /*
-    * Acre foot per min.
-    */
-    DLMS_UNIT_ACRE_FOOT_PER_MIN = 158,
-    /*
-    *  Acre foot per hour.
-    */
-    DLMS_UNIT_ACRE_FOOT_PER_HOUR = 159,
-    /*
-    *  Acre foot per day.
-    */
-    DLMS_UNIT_ACRE_FOOT_PER_DAY = 160,
-    /*
-    * Imperial gallon.
-    */
-    DLMS_UNIT_IMPERIAL_GALLON = 161,
-    /*
-    * Imperial gallon per second.
-    */
-    DLMS_UNIT_IMPERIAL_GALLON_PER_SECOND = 162,
-    /*
-    * Imperial gallon per min.
-    */
-    DLMS_UNIT_IMPERIAL_GALLON_PER_MIN = 163,
-    /*
-    * Imperial gallon per hour.
-    */
-    DLMS_UNIT_IMPERIAL_GALLON_PER_HOUR = 164,
-    /*
-    * Imperial gallon per day.
-    */
-    DLMS_UNIT_IMPERIAL_GALLON_PER_DAY = 165,
-    /*
-    * US gallon.
-    */
-    DLMS_UNIT_US_GALLON = 166,
-    /*
-    * US gallon per second.
-    */
-    DLMS_UNIT_US_GALLON_PER_SECOND = 167,
-    /*
-    * US gallon per min.
-    */
-    DLMS_UNIT_US_GALLON_PER_MIN = 168,
-    /*
-    * US gallon per hour.
-    */
-    DLMS_UNIT_US_GALLON_PER_HOUR = 169,
-    /*
-    * US gallon per day.
-    */
-    DLMS_UNIT_US_GALLON_PER_DAY = 170,
-    /*
-    * British thermal unit per second.
-    */
-    DLMS_UNIT_BRITISH_THERMAL_UNIT_PER_SECOND = 171,
-    /*
-    * British thermal unit per minute.
-    */        
-    DLMS_UNIT_BRITISH_THERMAL_UNIT_PER_MIN = 172,
-    /*
-    * British thermal unit per hour.
-    */
-    DLMS_UNIT_BRITISH_THERMAL_UNIT_PER_HOUR = 173,
-    /*
-    * British thermal unit per day.
-    */
-    DLMS_UNIT_BRITISH_THERMAL_UNIT_PER_DAY = 174,
-    /*
-    * Other Unit.
-    */
-    DLMS_UNIT_OTHER = 254,
-    /*
-    * No Unit.
-    */
-    DLMS_UNIT_NO_UNIT = 255
+        /*
+        * Phase angle degree.
+        */
+        DLMS_UNIT_PHASE_ANGLE_DEGREE = 8,
+        /*
+        * Temperature T degree centigrade, rad*180/p.
+        */
+        DLMS_UNIT_TEMPERATURE = 9,
+        /*
+        * Local currency.
+        */
+        DLMS_UNIT_LOCAL_CURRENCY = 10,
+        /*
+        * Length l meter m.
+        */
+        DLMS_UNIT_LENGTH = 11,
+        /*
+        * Speed v m/s.
+        */
+        DLMS_UNIT_SPEED = 12,
+        /*
+        * Volume V m3.
+        */
+        DLMS_UNIT_VOLUME_CUBIC_METER = 13,
+        /*
+        * Corrected volume m3.
+        */
+        DLMS_UNIT_CORRECTED_VOLUME = 14,
+        /*
+        * Volume flux m3/60*60s.
+        */
+        DLMS_UNIT_VOLUME_FLUX_HOUR = 15,
+        /*
+        * Corrected volume flux m3/60*60s.
+        */
+        DLMS_UNIT_CORRECTED_VOLUME_FLUX_HOUR = 16,
+        /*
+        * Volume flux m3/24*60*60s.
+        */
+        DLMS_UNIT_VOLUME_FLUX_DAY = 17,
+        /*
+        * Corrected volume flux m3/24*60*60s.
+        */
+        DLMS_UNIT_CORRECTED_VOLUME_FLUX_DAY = 18,
+        /*
+        * Volume 10-3 m3.
+        */
+        DLMS_UNIT_VOLUME_LITER = 19,
+        /*
+        * Mass m kilogram kg.
+        */
+        DLMS_UNIT_MASS_KG = 20,
+        /*
+        * return "Force F newton N.
+        */
+        DLMS_UNIT_FORCE = 21,
+        /*
+        * Energy newtonmeter J = Nm = Ws.
+        */
+        DLMS_UNIT_ENERGY = 22,
+        /*
+        * Pressure p pascal N/m2.
+        */
+        DLMS_UNIT_PRESSURE_PASCAL = 23,
+        /*
+        * Pressure p bar 10-5 N/m2.
+        */
+        DLMS_UNIT_PRESSURE_BAR = 24,
+        /*
+        * Energy joule J = Nm = Ws.
+        */
+        DLMS_UNIT_ENERGY_JOULE = 25,
+        /*
+        * Thermal power J/60*60s.
+        */
+        DLMS_UNIT_THERMAL_POWER = 26,
+        /*
+        * Active power P watt W = J/s.
+        */
+        DLMS_UNIT_ACTIVE_POWER = 27,
+        /*
+        * Apparent power S.
+        */
+        DLMS_UNIT_APPARENT_POWER = 28,
+        /*
+        * Reactive power Q.
+        */
+        DLMS_UNIT_REACTIVE_POWER = 29,
+        /*
+        * Active energy W*60*60s.
+        */
+        DLMS_UNIT_ACTIVE_ENERGY = 30,
+        /*
+        * Apparent energy VA*60*60s.
+        */
+        DLMS_UNIT_APPARENT_ENERGY = 31,
+        /*
+        * Reactive energy var*60*60s.
+        */
+        DLMS_UNIT_REACTIVE_ENERGY = 32,
+        /*
+        * Current I ampere A.
+        */
+        DLMS_UNIT_CURRENT = 33,
+        /*
+        * Electrical charge Q coulomb C = As.
+        */
+        DLMS_UNIT_ELECTRICAL_CHARGE = 34,
+        /*
+        * Voltage.
+        */
+        DLMS_UNIT_VOLTAGE = 35,
+        /*
+        * Electrical field strength E V/m.
+        */
+        DLMS_UNIT_ELECTRICAL_FIELD_STRENGTH = 36,
+        /*
+        * Capacity C farad C/V = As/V.
+        */
+        DLMS_UNIT_CAPACITY = 37,
+        /*
+        * Resistance R ohm = V/A.
+        */
+        DLMS_UNIT_RESISTANCE = 38,
+        /*
+        * Resistivity.
+        */
+        DLMS_UNIT_RESISTIVITY = 39,
+        /*
+        * Magnetic flux F weber Wb = Vs.
+        */
+        DLMS_UNIT_MAGNETIC_FLUX = 40,
+        /*
+        * Induction T tesla Wb/m2.
+        */
+        DLMS_UNIT_INDUCTION = 41,
+        /*
+        * Magnetic field strength H A/m.
+        */
+        DLMS_UNIT_MAGNETIC = 42,
+        /*
+        * Inductivity L henry H = Wb/A.
+        */
+        DLMS_UNIT_INDUCTIVITY = 43,
+        /*
+        * Frequency f.
+        */
+        DLMS_UNIT_FREQUENCY = 44,
+        /*
+        * Active energy meter constant 1/Wh.
+        */
+        DLMS_UNIT_ACTIVE = 45,
+        /*
+        * Reactive energy meter constant.
+        */
+        DLMS_UNIT_REACTIVE = 46,
+        /*
+        * Apparent energy meter constant.
+        */
+        DLMS_UNIT_APPARENT = 47,
+        /*
+        * V260*60s.
+        */
+        DLMS_UNIT_V260 = 48,
+        /*
+        * A260*60s.
+        */
+        DLMS_UNIT_A260 = 49,
+        /*
+        * Mass flux kg/s.
+        */
+        DLMS_UNIT_MASS_KG_PER_SECOND = 50,
+        /*
+        * Unit is Conductance siemens 1/ohm.
+        */
+        DLMS_UNIT_CONDUCTANCE = 51,
+        /*
+        * Temperature in Kelvin.
+        */
+        DLMS_UNIT_KELVIN = 52,
+        /*
+        * 1/(V2h) RU2h , volt-squared hour meter constant or pulse value.
+        */
+        DLMS_UNIT_RU2H = 53,
+        /*
+        * 1/(A2h) RI2h , ampere-squared hour meter constant or pulse value.
+        */
+        DLMS_UNIT_RI2H = 54,
+        /*
+        * 1/m3 RV , meter constant or pulse value  = volume).
+        */
+        DLMS_UNIT_CUBIC_METER_RV = 55,
+        /*
+        * Percentage.
+        */
+        DLMS_UNIT_PERCENTAGE = 56,
+        /*
+        * Ah ampere hours.
+        */
+        DLMS_UNIT_AMPERE_HOURS = 57,
+        /*
+        * Wh/m3 energy per volume 3,6*103 J/m3.
+        */
+        DLMS_UNIT_ENERGY_PER_VOLUME = 60,
+        /*
+        * J/m3 calorific value, wobbe.
+        */
+        DLMS_UNIT_WOBBE = 61,
+        /*
+        * Mol % molar fraction of gas composition mole percent  = Basic gas
+        * composition unit).
+        */
+        DLMS_UNIT_MOLE_PERCENT = 62,
+        /*
+        * g/m3 mass density, quantity of material.
+        */
+        DLMS_UNIT_MASS_DENSITY = 63,
+        /*
+        * Dynamic viscosity pascal second  = Characteristic of gas stream).
+        */
+        DLMS_UNIT_PASCAL_SECOND = 64,
+        /*
+        * J/kg Specific energy NOTE The amount of energy per unit of mass of a
+        * substance Joule / kilogram m2 . kg . s -2 / kg = m2.
+        */
+        DLMS_UNIT_JOULE_KILOGRAM = 65,
+        /*
+        * Pressure, gram per square centimeter.
+        */
+        DLMS_UNIT_PRESSURE_GRAM_PER_SQUARE_CENTIMETER = 66,
+        /*
+        * Pressure, atmosphere.
+        */
+        DLMS_UNIT_PRESSURE_ATMOSPHERE = 67,
+        /*
+        * Signal strength, dB milliwatt (e.g. of GSM radio systems)
+        */
+        DLMS_UNIT_SIGNAL_STRENGTH_MILLI_WATT = 70,
+        /*
+        * Signal strength, dB microvolt.
+        */
+        DLMS_UNIT_SIGNAL_STRENGTH_MICRO_VOLT = 71,
+        /*
+        * Logarithmic unit that expresses the ratio between two values of a physical quantity
+        */
+        DLMS_UNIT_DB = 72,
+        /*
+        * Length in inches.
+        */
+        DLMS_UNIT_INCH = 128,
+        /*
+        * Foot (Length).
+        */
+        DLMS_UNIT_FOOT = 129,
+        /*
+        * Pound (mass).
+        */
+        DLMS_UNIT_POUND = 130,
+        /*
+        * Fahrenheit.
+        */
+        DLMS_UNIT_FAHRENHEIT = 131,
+        /*
+        * Rankine.
+        */
+        DLMS_UNIT_RANKINE = 132,
+        /*
+        * Square inch.
+        */
+        DLMS_UNIT_SQUARE_INCH = 133,
+        /*
+        * Square foot.
+        */
+        DLMS_UNIT_SQUARE_FOOT = 134,
+        /*
+        * Acre.
+        */
+        DLMS_UNIT_ACRE = 135,
+        /*
+        * Cubic inch.
+        */
+        DLMS_UNIT_CUBIC_INCH = 136,
+        /*
+        * Cubic foot.
+        */
+        DLMS_UNIT_CUBIC_FOOT = 137,
+        /*
+        * Acre foot.
+        */
+        DLMS_UNIT_ACRE_FOOT = 138,
+        /*
+        * Gallon (imperial).
+        */
+        DLMS_UNIT_GALLON_IMPERIAL = 139,
+        /*
+        *  Gallon (US).
+        */
+        DLMS_UNIT_GALLON_US = 140,
+        /*
+        * Pound force.
+        */
+        DLMS_UNIT_POUND_FORCE = 141,
+        /*
+        * Pound force per square inch.
+        */
+        DLMS_UNIT_POUND_FORCE_PER_SQUARE_INCH = 142,
+        /*
+        * Pound per cubic foot.
+        */
+        DLMS_UNIT_POUND_PER_CUBIC_FOOT = 143,
+        /*
+        * Pound per (foot second).
+        */
+        DLMS_UNIT_POUND_PER_FOOT_SECOND = 144,
+        /*
+        * Square foot per second.
+        */
+        DLMS_UNIT_SQUARE_FOOT_PER_SECOND = 145,
+        /*
+        * British thermal unit.
+        */
+        DLMS_UNIT_BRITISH_THERMAL_UNIT = 146,
+        /*
+        * Therm EU.
+        */
+        DLMS_UNIT_THERM_EU = 147,
+        /*
+        * Therm US.
+        */
+        DLMS_UNIT_THERM_US = 148,
+        /*
+        * British thermal unit per pound.
+        */
+        DLMS_UNIT_BRITISH_THERMAL_UNIT_PER_POUND = 149,
+        /*
+        * British thermal unit per cubic foot.
+        */
+        DLMS_UNIT_BRITISH_THERMAL_UNIT_PER_CUBIC_FOOT = 150,
+        /*
+        * Cubic feet.
+        */
+        DLMS_UNIT_CUBIC_FEET = 151,
+        /*
+        * Foot per second.
+        */
+        DLMS_UNIT_FOOT_PER_SECOND = 152,
+        /*
+        * Cubic foot per second.
+        */
+        DLMS_UNIT_CUBIC_FOOT_PER_SECOND = 153,
+        /*
+        * Cubic foot per min.
+        */
+        DLMS_UNIT_CUBIC_FOOT_PER_MIN = 154,
+        /*
+        * Cubic foot per hour.
+        */
+        DLMS_UNIT_CUBIC_FOOT_PER_HOUR = 155,
+        /*
+        * Cubic foot per day
+        */
+        DLMS_UNIT_CUBIC_FOOT_PER_DAY = 156,
+        /*
+        * Acre foot per second.
+        */
+        DLMS_UNIT_ACRE_FOOT_PER_SECOND = 157,
+        /*
+        * Acre foot per min.
+        */
+        DLMS_UNIT_ACRE_FOOT_PER_MIN = 158,
+        /*
+        *  Acre foot per hour.
+        */
+        DLMS_UNIT_ACRE_FOOT_PER_HOUR = 159,
+        /*
+        *  Acre foot per day.
+        */
+        DLMS_UNIT_ACRE_FOOT_PER_DAY = 160,
+        /*
+        * Imperial gallon.
+        */
+        DLMS_UNIT_IMPERIAL_GALLON = 161,
+        /*
+        * Imperial gallon per second.
+        */
+        DLMS_UNIT_IMPERIAL_GALLON_PER_SECOND = 162,
+        /*
+        * Imperial gallon per min.
+        */
+        DLMS_UNIT_IMPERIAL_GALLON_PER_MIN = 163,
+        /*
+        * Imperial gallon per hour.
+        */
+        DLMS_UNIT_IMPERIAL_GALLON_PER_HOUR = 164,
+        /*
+        * Imperial gallon per day.
+        */
+        DLMS_UNIT_IMPERIAL_GALLON_PER_DAY = 165,
+        /*
+        * US gallon.
+        */
+        DLMS_UNIT_US_GALLON = 166,
+        /*
+        * US gallon per second.
+        */
+        DLMS_UNIT_US_GALLON_PER_SECOND = 167,
+        /*
+        * US gallon per min.
+        */
+        DLMS_UNIT_US_GALLON_PER_MIN = 168,
+        /*
+        * US gallon per hour.
+        */
+        DLMS_UNIT_US_GALLON_PER_HOUR = 169,
+        /*
+        * US gallon per day.
+        */
+        DLMS_UNIT_US_GALLON_PER_DAY = 170,
+        /*
+        * British thermal unit per second.
+        */
+        DLMS_UNIT_BRITISH_THERMAL_UNIT_PER_SECOND = 171,
+        /*
+        * British thermal unit per minute.
+        */
+        DLMS_UNIT_BRITISH_THERMAL_UNIT_PER_MIN = 172,
+        /*
+        * British thermal unit per hour.
+        */
+        DLMS_UNIT_BRITISH_THERMAL_UNIT_PER_HOUR = 173,
+        /*
+        * British thermal unit per day.
+        */
+        DLMS_UNIT_BRITISH_THERMAL_UNIT_PER_DAY = 174,
+        /*
+        * Other Unit.
+        */
+        DLMS_UNIT_OTHER = 254,
+        /*
+        * No Unit.
+        */
+        DLMS_UNIT_NO_UNIT = 255
     }DLMS_UNIT;
 
 
@@ -2831,13 +2928,13 @@ extern "C" {
     // Certificate entity.
     typedef enum {
         // Certificate entity is server.
-        DLMS_CERTIFICATE_ENTITY_Server = 0,
+        DLMS_CERTIFICATE_ENTITY_SERVER = 0,
         // Certificate entity is client.
-        DLMS_CERTIFICATE_ENTITY_Client,
+        DLMS_CERTIFICATE_ENTITY_CLIENT,
         // Certificate entity is certification authority.
-        DLMS_CERTIFICATE_ENTITY_Certification_Authority,
+        DLMS_CERTIFICATE_ENTITY_CERTIFICATION_AUTHORITY,
         // Certificate entity is other.
-        DLMS_CERTIFICATE_ENTITY_Other
+        DLMS_CERTIFICATE_ENTITY_OTHER
     }DLMS_CERTIFICATE_ENTITY;
 
     // Certificate type.
@@ -2850,7 +2947,7 @@ extern "C" {
         DLMS_CERTIFICATE_TYPE_TLS = 2,
         // Certificate type is other.
         DLMS_CERTIFICATE_TYPE_OTHER = 3
-    }    DLMS_CERTIFICATE_TYPE;
+    }DLMS_CERTIFICATE_TYPE;
 
     // Connection types.
     typedef enum {
@@ -2864,6 +2961,13 @@ extern "C" {
         DLMS_CONNECTION_STATE_IEC = 4
     }DLMS_CONNECTION_STATE;
 
+    // Used ECC scheme.
+    typedef enum {
+        //ECC-P256 domain parameters are used.
+        ECC_P256 = 0,
+        //ECC-384 domain parameters are used.
+        ECC_P384 = 1
+    }ECC;
     typedef enum {
         //Data is captured with Capture-method.
         DLMS_CAPTURE_METHOD_INVOKE,
@@ -3386,7 +3490,7 @@ extern "C" {
         // Not Defined.
         DLMS_PAN_DEVICE_TYPE_NOT_DEFINED
     }DLMS_PAN_DEVICE_TYPE;
-    
+
 
     // Defines the ZigBee status enumeration values.
     typedef enum
@@ -3412,6 +3516,76 @@ extern "C" {
         /// </summary>
         DLMS_ZIG_BEE_STATUS_SEP_TRANSMITTING = 0x10
     }DLMS_ZIG_BEE_STATUS;
+
+    /*Encoding of selective access parameters with data_index.*/
+    typedef enum
+    {
+        /*Selective access is not used.*/
+        DLMS_SELECTIVE_ACCESS_PARAMETER_NONE = 0x0,
+        /*Last number of entries.*/
+        DLMS_SELECTIVE_ACCESS_PARAMETER_ENTRIES_LAST = 0x1,
+        /*Number of entries after last confirmation.*/
+        DLMS_SELECTIVE_ACCESS_PARAMETER_ENTRIES_LAST_CONFIRMATION = 0x2,
+        /*Complete number of minutes after last confirmation.*/
+        DLMS_SELECTIVE_ACCESS_PARAMETER_MINUTES_LAST_CONFIRMATION = 0x3,
+        /*Complete number of hours after last confirmation.*/
+        DLMS_SELECTIVE_ACCESS_PARAMETER_HOURS_LAST_CONFIRMATION = 0x4,
+        /*Complete number of days after last confirmation.*/
+        DLMS_SELECTIVE_ACCESS_PARAMETER_DAYS_LAST_CONFIRMATION = 0x5,
+        /*Complete number of months after last confirmation.*/
+        DLMS_SELECTIVE_ACCESS_PARAMETER_MONTHS_LAST_CONFIRMATION = 0x6,
+        /*Last complete number of minutes including the current minute.*/
+        DLMS_SELECTIVE_ACCESS_PARAMETER_MINUTES = 0x7,
+        /*Last complete number of hours including the current hour.*/
+        DLMS_SELECTIVE_ACCESS_PARAMETER_HOURS = 0x8,
+        /*Last complete number of days including the current day.*/
+        DLMS_SELECTIVE_ACCESS_PARAMETER_DAYS = 0x9,
+        /*Last complete number of months including the current month.*/
+        DLMS_SELECTIVE_ACCESS_PARAMETER_MONTHS = 0xA,
+        /*Last number of seconds.*/
+        DLMS_SELECTIVE_ACCESS_PARAMETER_COMPLETE_SECONDS = 0xB,
+        /*Last complete number of minutes.*/
+        DLMS_SELECTIVE_ACCESS_PARAMETER_COMPLETE_MINUTES = 0xC,
+        /*Last complete number of hours.*/
+        DLMS_SELECTIVE_ACCESS_PARAMETER_COMPLETE_HOURS = 0xD,
+        /*Last complete number of days.*/
+        DLMS_SELECTIVE_ACCESS_PARAMETER_COMPLETE_DAYS = 0xE,
+        /*Last complete number of months.*/
+        DLMS_SELECTIVE_ACCESS_PARAMETER_COMPLETE_MONTHS = 0xF
+    }DLMS_SELECTIVE_ACCESS_PARAMETER;
+
+    /*Defines NTP authentication methods.*/
+    typedef enum
+    {
+        /*No security is used.*/
+        DLMS_NTP_AUTHENTICATION_METHOD_NO_SECURITY = 0,
+        /*Shared secrets are used.*/
+        DLMS_NTP_AUTHENTICATION_METHOD_SHARED_SECRETS,
+        /*IFF auto key is used.*/
+        DLMS_NTP_AUTHENTICATION_METHOD_AUTOKEY_IFF
+    }
+    DLMS_NTP_AUTHENTICATION_METHOD;
+
+    /*IPv6 Address type to add.*/
+    typedef enum
+    {
+        // Unicast address.
+        DLMS_IPV6_ADDRESS_TYPE_UNICAST,
+        // Multicast address.
+        DLMS_IPV6_ADDRESS_TYPE_MULTICAST,
+        // Gateway address.
+        DLMS_IPV6_ADDRESS_TYPE_GATEWAY
+    }
+    DLMS_IPV6_ADDRESS_TYPE;
+   
+    /*Used AES encryption.*/
+    typedef enum
+    {
+        /*AES 128 is used.*/
+        DLMS_AES_128,
+        /*AES 256 is used.*/
+        DLMS_AES_256
+    }DLMS_AES;
 #ifdef  __cplusplus
 }
 #endif

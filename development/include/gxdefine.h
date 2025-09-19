@@ -112,7 +112,7 @@ extern "C" {
 #define MAX_CLIENT_PDU_SIZE 200
 
 //Define max capture object buffer size.
-#define MAX_CAPTURE_OBJECT_BUFFER_SIZE 100
+#define MAX_CAPTURE_OBJECT_BUFFER_SIZE 200
 
 //Define max challenge size.
 #define MAX_CHALLENGE_SIZE 64
@@ -140,6 +140,12 @@ extern "C" {
 
 //Define neighbour table tone map size for G3 MAC Setup object.
 #define MAX_G3_MAC_NEIGHBOUR_TABLE_TONE_MAP_SIZE 5
+
+//X.509 certificate max size.
+#define DLMS_X509_CETRIFICATE_MAX_SIZE 2048
+
+//Define max authentication key length.
+#define MAX_AUTHENTICATION_KEY_LENGTH 20
 
 #ifdef  __cplusplus
 }

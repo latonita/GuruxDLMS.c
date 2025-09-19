@@ -34,8 +34,9 @@
 #define SERVER_EVENTS_H
 
 #include "gxignore.h"
-#if !defined(DLMS_IGNORE_SERVER) || defined(DLMS_DEBUG)
+#if !defined(DLMS_IGNORE_SERVER) || (defined(DLMS_DEBUG) || defined(DLMS_NOTIFY_AUTHENTICATION_ERROR))
 #include "dlmssettings.h"
+#include "bytebuffer.h"
 
 #ifdef  __cplusplus
 extern "C" {
@@ -70,6 +71,17 @@ extern "C" {
         dlmsSettings* settings,
         gxObject* obj,
         unsigned char index);
+
+#ifdef DLMS_USE_ACCESS_SELECTOR
+    /**
+    * Get access selectors.
+    */
+    extern int svr_getAccessSelector(
+        dlmsSettings* settings,
+        gxObject* obj,
+        unsigned char index,
+        gxByteBuffer* data);
+#endif //DLMS_USE_ACCESS_SELECTOR
 
     /**
     * called when client makes connection to the server.
@@ -215,13 +227,76 @@ extern "C" {
 #endif //DLMS_DEBUG
 
     //Server uses notify trace if DLMS_DEBUG is defined.
-    void svr_notifyTrace(const char* str, int err);
+    void svr_notifyTrace(const char* str, int32_t err);
 
     //Server uses notify trace if DLMS_DEBUG is defined.
-    void svr_notifyTrace2(const char* str, const short ot, const unsigned char* ln, int err);
+    void svr_notifyTrace2(const char* str, const short ot, const unsigned char* ln, int32_t err);
+
+    //Server uses notify trace if DLMS_DEBUG is defined.
+    void svr_notifyTrace3(const char* str, const char* value);
+
+    //Server uses notify trace if DLMS_DEBUG is defined.
+    void svr_notifyTrace4(const char* str, gxByteBuffer* value);
+
+    //Server uses notify trace if DLMS_DEBUG is defined.
+    void svr_notifyTrace5(const char* str, const unsigned char* value, uint16_t length);
+
+#ifdef DLMS_INVOCATION_COUNTER_VALIDATOR
+    //Some DLMS sub standard define that invocation counter must between given range.
+    //Returns zero if the invocation counter is accepted.
+    extern unsigned char svr_validateInvocationCounter(
+        dlmsSettings* settings,
+        uint32_t value);
+
+    /* Code example:
+    unsigned char svr_validateInvocationCounter(dlmsSettings* settings, uint32_t value)
+    {
+        if (value < *settings->expectedInvocationCounter - 3 &&
+            value > *settings->expectedInvocationCounter + 3) {
+            // If the IC value is out of the expected range
+            return 1;
+        }
+        *settings->expectedInvocationCounter = value + 1;
+        return 0;
+    }
+    */
+#endif //DLMS_INVOCATION_COUNTER_VALIDATOR
+
+#ifdef DLMS_NOTIFY_AUTHENTICATION_ERROR
+    //Meter notifies from the authentication error.
+    extern void svr_authenticationError();
+#endif //DLMS_NOTIFY_AUTHENTICATION_ERROR
+
+#ifdef DLMS_WRITE_MULTIPLE_DATABLOCKS
+    /*The client is writing a value that does not fit into a single PDU, so the meter
+    must temporarily store it in flash or RAM before updating the corresponding COSEM object.
+    DLMS_ERROR_CODE_FALSE is returned if value is already updated.
+    svr_preWrite and svr_postWrite are not called when custom write is used.
+    */
+    extern int svr_storePartialPDU(
+        dlmsSettings* settings,
+        gxObject* obj,
+        unsigned char index,
+        gxByteBuffer* value);
+
+    /*Partical PDU is removed when the first PDU is received.*/
+    extern int svr_clearPartialPDU(
+        dlmsSettings* settings,
+        gxObject* obj,
+        unsigned char index);
+
+    /*Server asks the complete data after all PDUs are received. This value is updated.
+    DLMS_ERROR_CODE_FALSE is returned if value is already updated.
+    */
+    extern int svr_getCompletePDU(
+        dlmsSettings* settings,
+        gxObject* obj,
+        unsigned char index,
+        gxByteBuffer* value);
+#endif //DLMS_WRITE_MULTIPLE_DATABLOCKS
 
 #ifdef  __cplusplus
 }
 #endif
-#endif //DLMS_IGNORE_SERVER
+#endif //!defined(DLMS_IGNORE_SERVER) && (defined(DLMS_DEBUG) || defined(DLMS_NOTIFY_AUTHENTICATION_ERROR))
 #endif //SERVER_EVENTS_H

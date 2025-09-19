@@ -83,6 +83,8 @@ extern "C" {
 #else
         struct tm value;
 #endif
+        /*Milliseconds.*/
+        uint16_t millisecond;
         int16_t deviation;
         DATETIME_SKIPS skip : 16;
         DLMS_DATE_TIME_EXTRA_INFO extraInfo : 8;
@@ -202,6 +204,20 @@ Get years from time.
         uint32_t value);
 
     /*
+    Adds amount of years to current time.
+    */
+    void time_addYears(
+        gxtime* value,
+        int years);
+
+    /*
+    Adds amount of months to current time.
+    */
+        void time_addMonths(
+            gxtime* value,
+            int months);
+
+    /*
     Adds amount of days to current time.
     */
     void time_addDays(
@@ -236,10 +252,21 @@ Get years from time.
         gxtime* value);
 
     /*
+    Returns the date.
+*/
+    uint32_t time_getDate(uint32_t value);
+
+    /*
     Clears time part.
     */
     void time_clearTime(
         gxtime* value);
+
+    /*
+    Returns the time.
+    */
+    uint32_t time_getTime(uint32_t value);
+
 
     /*
     Clears hours.

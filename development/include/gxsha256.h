@@ -42,7 +42,7 @@ extern "C" {
 
 #include "bytebuffer.h"
 
-    int gxsha256_encrypt(gxByteBuffer* data, gxByteBuffer* digest);
+    int gxsha256_hash(gxByteBuffer* data, gxByteBuffer* digest);
     
 #ifdef  __cplusplus
 }

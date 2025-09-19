@@ -40,6 +40,7 @@
 #include <crtdbg.h>
 #endif
 #include <string.h>
+#include "../include/enums.h"
 #include "../include/datainfo.h"
 #include "../include/dlms.h"
 #include "../include/cosem.h"
@@ -430,6 +431,16 @@ uint16_t cosem_getObjectSize(DLMS_OBJECT_TYPE type)
         size = sizeof(gxSFSKReportingSystemList);
         break;
 #endif //DLMS_IGNORE_SFSK_REPORTING_SYSTEM_LIST
+#ifndef DLMS_OBJECT_TYPE_LTE_MONITORING
+    case DLMS_OBJECT_TYPE_LTE_MONITORING:
+        size = sizeof(gxLteMonitoring);
+        break;
+#endif //DLMS_OBJECT_TYPE_LTE_MONITORING
+#ifndef DLMS_IGNORE_NTP_SETUP
+    case DLMS_OBJECT_TYPE_NTP_SETUP:
+        size = sizeof(gxNtpSetup);
+        break;
+#endif //DLMS_IGNORE_NTP_SETUP
 #ifdef DLMS_ITALIAN_STANDARD
     case DLMS_OBJECT_TYPE_TARIFF_PLAN:
         size = sizeof(gxTariffPlan);
@@ -607,6 +618,11 @@ int cosem_init4(
     }
     break;
 #endif //DLMS_IGNORE_ASSOCIATION_SHORT_NAME
+#ifndef DLMS_IGNORE_PROFILE_GENERIC
+    case DLMS_OBJECT_TYPE_PROFILE_GENERIC:
+        ((gxObject*)object)->version = 1;
+        break;
+#endif //DLMS_IGNORE_PROFILE_GENERIC
     case DLMS_OBJECT_TYPE_AUTO_ANSWER:
         break;
     case DLMS_OBJECT_TYPE_AUTO_CONNECT:
@@ -620,8 +636,32 @@ int cosem_init4(
         break;
     case DLMS_OBJECT_TYPE_GPRS_SETUP:
         break;
+#ifndef DLMS_IGNORE_SECURITY_SETUP
     case DLMS_OBJECT_TYPE_SECURITY_SETUP:
-        break;
+    {
+        //Set default keys.
+#ifdef DLMS_IGNORE_MALLOC
+        memcpy(((gxSecuritySetup*)object)->gak, DEFAULT_AUTHENTICATION_KEY, sizeof(DEFAULT_AUTHENTICATION_KEY));
+        memcpy(((gxSecuritySetup*)object)->guek, DEFAULT_BLOCK_CIPHER_KEY, sizeof(DEFAULT_BLOCK_CIPHER_KEY));
+        memcpy(((gxSecuritySetup*)object)->gbek, DEFAULT_BROADCAST_BLOCK_CIPHER_KEY, sizeof(DEFAULT_BROADCAST_BLOCK_CIPHER_KEY));
+#else
+        BYTE_BUFFER_INIT(&((gxSecuritySetup*)object)->guek);
+        bb_set(&((gxSecuritySetup*)object)->guek, DEFAULT_BLOCK_CIPHER_KEY, sizeof(DEFAULT_BLOCK_CIPHER_KEY));
+        BYTE_BUFFER_INIT(&((gxSecuritySetup*)object)->gbek);
+        bb_set(&((gxSecuritySetup*)object)->gbek, DEFAULT_BROADCAST_BLOCK_CIPHER_KEY, sizeof(DEFAULT_BROADCAST_BLOCK_CIPHER_KEY));
+        BYTE_BUFFER_INIT(&((gxSecuritySetup*)object)->gak);
+        bb_set(&((gxSecuritySetup*)object)->gak, DEFAULT_AUTHENTICATION_KEY, sizeof(DEFAULT_AUTHENTICATION_KEY));
+#endif //DLMS_IGNORE_MALLOC
+
+#if defined(DLMS_SECURITY_SUITE_1) || defined(DLMS_SECURITY_SUITE_1)
+        ((gxObject*)object)->version = 1;
+        priv_init(&((gxSecuritySetup*)object)->signingKey);
+        priv_init(&((gxSecuritySetup*)object)->keyAgreementKey);
+        priv_init(&((gxSecuritySetup*)object)->tlsKey);
+#endif //defined(DLMS_SECURITY_SUITE_1) || defined(DLMS_SECURITY_SUITE_1)        
+    }
+    break;
+#endif //DLMS_IGNORE_SECURITY_SETUP
 #ifndef DLMS_IGNORE_IEC_HDLC_SETUP
     case DLMS_OBJECT_TYPE_IEC_HDLC_SETUP:
         ((gxObject*)object)->version = 1;
@@ -643,13 +683,18 @@ int cosem_init4(
         break;
     case DLMS_OBJECT_TYPE_IP4_SETUP:
         break;
+#ifndef DLMS_IGNORE_IP6_SETUP
     case DLMS_OBJECT_TYPE_IP6_SETUP:
+        memset(&((gxIp6Setup*)object)->primaryDNSAddress, 0, sizeof(IN6_ADDR));
+        memset(&((gxIp6Setup*)object)->secondaryDNSAddress, 0, sizeof(IN6_ADDR));
         break;
+#endif //DLMS_IGNORE_IP6_SETUP
     case DLMS_OBJECT_TYPE_MBUS_SLAVE_PORT_SETUP:
         break;
     case DLMS_OBJECT_TYPE_IMAGE_TRANSFER:
         break;
     case DLMS_OBJECT_TYPE_DISCONNECT_CONTROL:
+        ((gxObject*)object)->version = 1;
         break;
     case DLMS_OBJECT_TYPE_LIMITER:
         break;
@@ -661,10 +706,6 @@ int cosem_init4(
         break;
     case DLMS_OBJECT_TYPE_PPP_SETUP:
         break;
-#ifndef DLMS_IGNORE_PROFILE_GENERIC
-    case DLMS_OBJECT_TYPE_PROFILE_GENERIC:
-        break;
-#endif //DLMS_IGNORE_PROFILE_GENERIC
     case DLMS_OBJECT_TYPE_REGISTER_ACTIVATION:
         break;
     case DLMS_OBJECT_TYPE_REGISTER_MONITOR:
@@ -733,6 +774,9 @@ int cosem_init4(
         ((gxObject*)object)->version = 3;
         break;
     case DLMS_OBJECT_TYPE_FUNCTION_CONTROL:
+        break;
+    case DLMS_OBJECT_TYPE_LTE_MONITORING:
+        ((gxObject*)object)->version = 1;
         break;
     default:
         break;
@@ -926,7 +970,10 @@ int cosem_getInt32(gxByteBuffer* bb, int32_t* value)
     return 0;
 }
 
-int cosem_getOctetStringBase(gxByteBuffer* bb, gxByteBuffer* value, unsigned char type, unsigned char exact)
+int cosem_getOctetStringBase(gxByteBuffer* bb,
+    gxByteBuffer* value,
+    unsigned char type,
+    unsigned char exact)
 {
     int ret;
     unsigned char tmp;
@@ -943,7 +990,9 @@ int cosem_getOctetStringBase(gxByteBuffer* bb, gxByteBuffer* value, unsigned cha
     {
         return ret;
     }
-    if (exact && count != bb_getCapacity(value))
+    if ((exact && count != bb_getCapacity(value)) ||
+        //Octet-string is too big.
+        count > bb_getCapacity(value))
     {
         return DLMS_ERROR_CODE_INCONSISTENT_CLASS_OR_OBJECT;
     }
@@ -955,7 +1004,11 @@ int cosem_getOctetStringBase(gxByteBuffer* bb, gxByteBuffer* value, unsigned cha
     return 0;
 }
 
-int cosem_getOctetStringBase2(gxByteBuffer* bb, unsigned char* value, uint16_t capacity, uint16_t* size, unsigned char type)
+int cosem_getOctetStringBase2(gxByteBuffer* bb,
+    unsigned char* value,
+    uint16_t capacity,
+    uint16_t* size,
+    unsigned char type)
 {
     int ret;
     unsigned char tmp;
@@ -1233,6 +1286,31 @@ int cosem_getVariant(gxByteBuffer* bb, dlmsVARIANT* value)
     return ret;
 }
 
+int cosem_getVariantExact(gxByteBuffer* bb, dlmsVARIANT* value)
+{
+    int ret;
+    unsigned char ch;
+    gxDataInfo info;
+    if ((ret = bb_getUInt8(bb, &ch)) == 0)
+    {
+        if (ch != value->vt)
+        {
+            ret = DLMS_ERROR_CODE_INCONSISTENT_CLASS_OR_OBJECT;
+        }
+        else
+        {
+            var_clear(value);
+            if (ch != DLMS_DATA_TYPE_NONE)
+            {
+                di_init(&info);
+                --bb->position;
+                ret = dlms_getData(bb, &info, value);
+            }
+        }
+    }
+    return ret;
+}
+
 int cosem_getEnum(gxByteBuffer* bb, unsigned char* value)
 {
     int ret;
@@ -1309,27 +1387,34 @@ int cosem_setBitString(gxByteBuffer* bb, uint32_t value, uint16_t count)
 {
     int ret = 0;
     uint16_t pos;
-    uint16_t capacity = count == 0 ? 2 : (3 + (count / 8));
-    capacity += (uint16_t)bb_size(bb);
-    if (bb_getCapacity(bb) < capacity)
+    if (count > 32)
     {
-        ret = bb_capacity(bb, capacity);
+        ret = DLMS_ERROR_CODE_INVALID_PARAMETER;
     }
-    if (ret == 0 &&
-        (ret = bb_setUInt8(bb, DLMS_DATA_TYPE_BIT_STRING)) == 0 &&
-        (ret = hlp_setObjectCount(count, bb)) == 0)
+    else
     {
-        bitArray ba;
-        ba_attach(&ba, bb->data + bb->size, 0, (uint16_t)(8 * (bb->size - bb->size)));
-        for (pos = 0; pos != count; ++pos)
+        uint16_t capacity = count == 0 ? 2 : (3 + (count / 8));
+        capacity += (uint16_t)bb_size(bb);
+        if (bb_getCapacity(bb) < capacity)
         {
-            if ((ret = ba_setByIndex(&ba, pos, value & 01)) != 0)
-            {
-                break;
-            }
-            value >>= 1;
+            ret = bb_capacity(bb, capacity);
         }
-        bb->size += ba_getByteCount(count);
+        if (ret == 0 &&
+            (ret = bb_setUInt8(bb, DLMS_DATA_TYPE_BIT_STRING)) == 0 &&
+            (ret = hlp_setObjectCount(count, bb)) == 0)
+        {
+            bitArray ba;
+            ba_attach(&ba, bb->data + bb->size, 0, count);
+            for (pos = 0; pos != count; ++pos)
+            {
+                if ((ret = ba_setByIndex(&ba, pos, value & 01)) != 0)
+                {
+                    break;
+                }
+                value >>= 1;
+            }
+            bb->size += ba_getByteCount(count);
+        }
     }
     return ret;
 }
@@ -1359,7 +1444,7 @@ int cosem_setOctetString(gxByteBuffer* bb, gxByteBuffer* value)
         }
     }
     else if ((ret = bb_setUInt8(bb, DLMS_DATA_TYPE_OCTET_STRING)) != 0 ||
-        (ret = bb_setUInt8(bb, (unsigned char)value->size)) != 0 ||
+        (ret = hlp_setObjectCount(value->size, bb)) != 0 ||
         (ret = bb_set(bb, value->data, (uint16_t)value->size)) != 0)
     {
         //Error code is returned at the end of the function.
@@ -1464,7 +1549,7 @@ int cosem_setOctetString2(
         }
     }
     else if ((ret = bb_setUInt8(bb, DLMS_DATA_TYPE_OCTET_STRING)) != 0 ||
-        (ret = bb_setUInt8(bb, (unsigned char)size)) != 0 ||
+        (ret = hlp_setObjectCount(size, bb)) != 0 ||
         (ret = bb_set(bb, value, size)) != 0)
     {
         //Error code is returned at the end of the function.
@@ -1763,10 +1848,9 @@ int cosem_getColumns(
         else
         {
             int pos2;
-            uint16_t ot;
+            uint16_t ot, dIndex;
             unsigned char ln[6];
             signed char aIndex;
-            short dIndex;
             columns->size = 0;
             for (pos = 0; pos != count; ++pos)
             {
@@ -1774,7 +1858,7 @@ int cosem_getColumns(
                     (ret = cosem_getUInt16(parameters->byteArr, &ot)) != 0 ||
                     (ret = cosem_getOctetString2(parameters->byteArr, ln, 6, NULL)) != 0 ||
                     (ret = cosem_getInt8(parameters->byteArr, &aIndex)) != 0 ||
-                    (ret = cosem_getInt16(parameters->byteArr, &dIndex)) != 0)
+                    (ret = cosem_getUInt16(parameters->byteArr, &dIndex)) != 0)
                 {
                     break;
                 }
@@ -1966,3 +2050,185 @@ int cosem_findObjectByLN(
     }
     return ret;
 }
+
+#ifndef DLMS_IGNORE_DELTA
+int cosem_setDeltaUInt8(gxByteBuffer* bb, unsigned char value)
+{
+    int ret;
+    if ((ret = bb_setUInt8(bb, DLMS_DATA_TYPE_DELTA_UINT8)) != 0 ||
+        (ret = bb_setUInt8(bb, value)) != 0)
+    {
+        //Error code is returned at the end of the function.
+    }
+    return ret;
+}
+
+int cosem_setDeltaUInt16(gxByteBuffer* bb, uint16_t value)
+{
+    int ret;
+    if ((ret = bb_setUInt8(bb, DLMS_DATA_TYPE_DELTA_UINT16)) != 0 ||
+        (ret = bb_setUInt16(bb, value)) != 0)
+    {
+        //Error code is returned at the end of the function.
+    }
+    return ret;
+}
+
+int cosem_setDeltaUInt32(gxByteBuffer* bb, uint32_t value)
+{
+    int ret;
+    if ((ret = bb_setUInt8(bb, DLMS_DATA_TYPE_DELTA_UINT32)) != 0 ||
+        (ret = bb_setUInt32(bb, value)) != 0)
+    {
+        //Error code is returned at the end of the function.
+    }
+    return ret;
+}
+
+int cosem_setDeltaInt8(gxByteBuffer* bb, char value)
+{
+    int ret;
+    if ((ret = bb_setUInt8(bb, DLMS_DATA_TYPE_DELTA_INT8)) != 0 ||
+        (ret = bb_setInt8(bb, value)) != 0)
+    {
+        //Error code is returned at the end of the function.
+    }
+    return ret;
+}
+
+int cosem_setDeltaInt16(gxByteBuffer* bb, int16_t value)
+{
+    int ret;
+    if ((ret = bb_setUInt8(bb, DLMS_DATA_TYPE_DELTA_INT16)) != 0 ||
+        (ret = bb_setInt16(bb, value)) != 0)
+    {
+        //Error code is returned at the end of the function.
+    }
+    return ret;
+}
+
+int cosem_setDeltaInt32(gxByteBuffer* bb, int32_t value)
+{
+    int ret;
+    if ((ret = bb_setUInt8(bb, DLMS_DATA_TYPE_DELTA_INT32)) != 0 ||
+        (ret = bb_setInt32(bb, value)) != 0)
+    {
+        //Error code is returned at the end of the function.
+    }
+    return ret;
+}
+
+int cosem_getDeltaUInt8(gxByteBuffer* bb, unsigned char* value)
+{
+    int ret;
+    unsigned char tmp;
+    if ((ret = bb_getUInt8(bb, &tmp)) != 0)
+    {
+        return ret;
+    }
+    if (tmp != DLMS_DATA_TYPE_DELTA_UINT8)
+    {
+        return DLMS_ERROR_CODE_UNMATCH_TYPE;
+    }
+    if ((ret = bb_getUInt8(bb, value)) != 0)
+    {
+        return ret;
+    }
+    return 0;
+}
+
+int cosem_getDeltaUInt16(gxByteBuffer* bb, uint16_t* value)
+{
+    int ret;
+    unsigned char tmp;
+    if ((ret = bb_getUInt8(bb, &tmp)) != 0)
+    {
+        return ret;
+    }
+    if (tmp != DLMS_DATA_TYPE_DELTA_UINT16)
+    {
+        return DLMS_ERROR_CODE_UNMATCH_TYPE;
+    }
+    if ((ret = bb_getUInt16(bb, value)) != 0)
+    {
+        return ret;
+    }
+    return 0;
+}
+
+int cosem_getDeltaUInt32(gxByteBuffer* bb, uint32_t* value)
+{
+    int ret;
+    unsigned char tmp;
+    if ((ret = bb_getUInt8(bb, &tmp)) != 0)
+    {
+        return ret;
+    }
+    if (tmp != DLMS_DATA_TYPE_DELTA_UINT32)
+    {
+        return DLMS_ERROR_CODE_UNMATCH_TYPE;
+    }
+    if ((ret = bb_getUInt32(bb, value)) != 0)
+    {
+        return ret;
+    }
+    return 0;
+}
+
+int cosem_getDeltaInt8(gxByteBuffer* bb, signed char* value)
+{
+    int ret;
+    unsigned char tmp;
+    if ((ret = bb_getUInt8(bb, &tmp)) != 0)
+    {
+        return ret;
+    }
+    if (tmp != DLMS_DATA_TYPE_DELTA_INT8)
+    {
+        return DLMS_ERROR_CODE_UNMATCH_TYPE;
+    }
+    if ((ret = bb_getInt8(bb, value)) != 0)
+    {
+        return ret;
+    }
+    return 0;
+}
+
+int cosem_getDeltaInt16(gxByteBuffer* bb, int16_t* value)
+{
+    int ret;
+    unsigned char tmp;
+    if ((ret = bb_getUInt8(bb, &tmp)) != 0)
+    {
+        return ret;
+    }
+    if (tmp != DLMS_DATA_TYPE_DELTA_INT16)
+    {
+        return DLMS_ERROR_CODE_UNMATCH_TYPE;
+    }
+    if ((ret = bb_getInt16(bb, value)) != 0)
+    {
+        return ret;
+    }
+    return 0;
+}
+
+int cosem_getDeltaInt32(gxByteBuffer* bb, int32_t* value)
+{
+    int ret;
+    unsigned char tmp;
+    if ((ret = bb_getUInt8(bb, &tmp)) != 0)
+    {
+        return ret;
+    }
+    if (tmp != DLMS_DATA_TYPE_DELTA_INT32)
+    {
+        return DLMS_ERROR_CODE_UNMATCH_TYPE;
+    }
+    if ((ret = bb_getInt32(bb, value)) != 0)
+    {
+        return ret;
+    }
+    return 0;
+}
+#endif //DLMS_IGNORE_DELTA
