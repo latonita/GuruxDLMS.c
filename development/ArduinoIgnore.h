@@ -88,7 +88,7 @@ extern "C" {
     // #define DLMS_IGNORE_ARRAY_MANAGER
     // #define DLMS_IGNORE_NTP_SETUP
 
-    // #define DLMS_IGNORE_MALLOC
+    #define DLMS_IGNORE_MALLOC
     // #define DLMS_USE_CUSTOM_MALLOC
 
     // #define DLMS_IGNORE_OBJECT_POINTERS
